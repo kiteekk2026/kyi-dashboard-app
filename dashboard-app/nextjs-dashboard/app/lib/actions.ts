@@ -3,11 +3,12 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import postgres from 'postgres';
+// import postgres from 'postgres';
+import sql from '@/app/lib/db'
 import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
 
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+// const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
 const FormSchema = z.object({
   id: z.string(),

@@ -1,4 +1,5 @@
-import postgres from 'postgres';
+// import postgres from 'postgres';
+import sql from '@/app/lib/db'
 import {
   CustomerField,
   CustomersTableType,
@@ -9,7 +10,15 @@ import {
 } from './definitions';
 import { formatCurrency } from './utils';
 
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+// const isLocalDb =
+//   process.env.POSTGRES_URL?.includes('127.0.0.1') ||
+//   process.env.POSTGRES_URL?.includes('localhost');
+
+// const sql = postgres(process.env.POSTGRES_URL!, {
+//   ssl: isLocalDb ? false : 'require',
+// });
+
+
 
 export async function fetchRevenue() {
   try {
