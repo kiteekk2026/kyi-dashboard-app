@@ -127,11 +127,12 @@ import {fetchFilteredCustomers }from '@/app/lib/data';
 import {FormattedCustomersTable }from '@/app/lib/definitions';
 
 export default async function CustomersTable({
-  query,
+  query, currentPage,
 }: {
   query: string;
+  currentPage: number;
 }) {
-  const customers = await fetchFilteredCustomers(query);
+  const customers = await fetchFilteredCustomers(query, currentPage);
 
   // Empty state
   if (customers.length=== 0) {
