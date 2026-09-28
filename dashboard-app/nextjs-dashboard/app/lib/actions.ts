@@ -10,7 +10,9 @@ import sql from '@/app/lib/db'
 // import { AuthError } from 'next-auth';
 import { headers } from 'next/headers';
 import { createClient } from '@/app/lib/supabase/server';
-
+import {writeFile,mkdir }from 'fs/promises';
+import path from 'path';
+import {randomUUID }from 'crypto';
 
 // const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
@@ -218,4 +220,117 @@ export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect('/');
+}
+
+const ALLOWED_EXISTING = [
+  '/customers/amy-burns.png',
+  '/customers/balazs-orban.png',
+  '/customers/delba-de-oliveira.png',
+  '/customers/evil-rabbit.png',
+  '/customers/lee-robinson.png',
+  '/customers/michael-novotny.png',
+]as const;
+
+const CustomerFormSchema = z.object({
+  name:z.string().min(1, { message:'Please enter a name.' }),
+  email:z.string().email({ message:'Please enter a valid email.' }),
+  image_url:z.string().optional(),// will be filled by us
+});
+
+export type CustomerState = {
+  errors?: {
+    name?: string[];
+    email?: string[];
+    image_url?: string[];
+  };
+  message?: string | null;
+};
+
+export async function createCustomer(
+  prevState: CustomerState,
+  formData: FormData,
+) {
+  // 1. Basic field validation
+  const validatedFields = CustomerFormSchema.safeParse({
+    name:formData.get('name'),
+    email:formData.get('email'),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      errors:validatedFields.error.flatten().fieldErrors,
+      message:'Missing Fields. Failed to Create Customer.',
+    };
+  }
+
+  const {name,email }= validatedFields.data;
+
+  // 2. Resolve the image
+  let image_url: string | null = null;
+
+  const existing = formData.get('image_url')as string | null;
+  const file = formData.get('avatar')as File | null;
+
+  if (file && file.size > 0) {
+    // ----- Upload path -----
+    // Basic safety checks
+    if (!file.type.startsWith('image/')) {
+      return {
+        errors: { image_url: ['Only image files are allowed.'] },
+        message:'Invalid file type.',
+      };
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      // 2 MB limit
+      return {
+        errors: { image_url: ['Image must be smaller than 2 MB.'] },
+        message:'File too large.',
+      };
+    }
+
+    try {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+
+      // Ensure directory exists
+      const uploadDir = path.join(process.cwd(),'public','customers');
+      await mkdir(uploadDir, { recursive:true });
+
+      // Unique filename
+      const ext = path.extname(file.name)|| '.png';
+      const filename = `${randomUUID()}${ext}`;
+      const filepath = path.join(uploadDir,filename);
+
+      await writeFile(filepath,buffer);
+      image_url = `/customers/${filename}`;
+    }catch (err) {
+      console.error('Upload error:',err);
+      return {
+        message:'Failed to upload image.',
+      };
+    }
+  }else if (existing && ALLOWED_EXISTING.includes(existing as any)) {
+    // ----- Existing avatar path -----
+    image_url = existing;
+  }else {
+    return {
+      errors: { image_url: ['Please select or upload an avatar.'] },
+      message:'Missing avatar.',
+    };
+  }
+
+  // 3. Insert into database
+  try {
+    await sql`
+      INSERT INTO customers (name, email, image_url)
+      VALUES (${name}, ${email}, ${image_url})
+    `;
+  }catch (error) {
+    return {
+      message:'Database Error: Failed to Create Customer.',
+    };
+  }
+
+  revalidatePath('/dashboard/customers');
+  redirect('/dashboard/customers');
 }
