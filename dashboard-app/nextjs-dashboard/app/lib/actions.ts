@@ -192,6 +192,28 @@ export async function signInWithGithub(formData: FormData) {
   redirect(data.url);
 }
 
+//########## Google ###################
+// export async function signInWithGoogle(formData: FormData) {
+//   const origin = (await headers()).get('origin');
+//   const next = safeRedirectPath(formData.get('redirectTo'));
+
+//   const supabase = await createClient();
+//   const { data, error } = await supabase.auth.signInWithOAuth({
+//     provider: 'google',
+//     options: {
+//       redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+//       queryParams: {
+//         access_type: 'offline',
+//         prompt: 'consent',
+//       },
+//     },
+//   });
+
+//   if (error || !data.url) redirect('/login?error=oauth');
+
+//   redirect(data.url);
+// }
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
