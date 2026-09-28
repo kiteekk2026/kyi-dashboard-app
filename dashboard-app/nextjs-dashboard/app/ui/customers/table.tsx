@@ -123,8 +123,9 @@
 // }
 
 import Image from 'next/image';
-import {fetchFilteredCustomers }from '@/app/lib/data';
-import {FormattedCustomersTable }from '@/app/lib/definitions';
+import { fetchFilteredCustomers } from '@/app/lib/data';
+import { FormattedCustomersTable } from '@/app/lib/definitions';
+import Link from 'next/link';
 
 export default async function CustomersTable({
   query, currentPage,
@@ -135,7 +136,7 @@ export default async function CustomersTable({
   const customers = await fetchFilteredCustomers(query, currentPage);
 
   // Empty state
-  if (customers.length=== 0) {
+  if (customers.length === 0) {
     return (
       <div className="mt-6 flow-root">
         <div className="inline-block min-w-full align-middle">
@@ -154,7 +155,7 @@ export default async function CustomersTable({
           <div className="overflow-hidden rounded-md bg-gray-50 p-2 md:pt-0">
             {/* Mobile view */}
             <div className="md:hidden">
-              {customers.map((customer)=> (
+              {customers.map((customer) => (
                 <div
                   key={customer.id}
                   className="mb-2 w-full rounded-md bg-white p-4"
@@ -170,7 +171,12 @@ export default async function CustomersTable({
                             width={28}
                             height={28}
                           />
-                          <p>{customer.name}</p>
+                          <Link
+                            href={`/dashboard/customers/${customer.id}`}
+                            className="hover:underline"
+                          >
+                            <p>{customer.name}</p>
+                          </Link>
                         </div>
                       </div>
                       <p className="text-sm text-gray-500">{customer.email}</p>
@@ -215,8 +221,8 @@ export default async function CustomersTable({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 text-gray-900">
-                {customers.map((customer)=> (
-                  <tr key={customer.id}className="group">
+                {customers.map((customer) => (
+                  <tr key={customer.id} className="group">
                     <td className="whitespace-nowrap bg-white py-5 pl-4 pr-3 text-sm text-black group-first-of-type:rounded-md group-last-of-type:rounded-md sm:pl-6">
                       <div className="flex items-center gap-3">
                         <Image
@@ -226,7 +232,12 @@ export default async function CustomersTable({
                           width={28}
                           height={28}
                         />
-                        <p>{customer.name}</p>
+                        <Link
+                          href={`/dashboard/customers/${customer.id}`}
+                          className="hover:underline"
+                        >
+                          <p>{customer.name}</p>
+                        </Link>
                       </div>
                     </td>
                     <td className="whitespace-nowrap bg-white px-4 py-5 text-sm">

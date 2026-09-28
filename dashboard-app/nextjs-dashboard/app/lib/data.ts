@@ -247,3 +247,59 @@ export async function fetchCustomersPages(query: string) {
     throw new Error('Failed to fetch total number of customers.');
   }
 }
+
+// ─── Customer profile + aggregates ───────────────────────────────────
+export async function fetchCustomerById(id: string) {
+  try {
+    const data = await sql<CustomersTableType[]>`
+      SELECT
+        customers.id,
+        customers.name,
+        customers.email,
+        customers.image_url,
+        COUNT(invoices.id) AS total_invoices,
+        SUM(CASE WHEN invoices.status = 'pending' THEN invoices.amount ELSE 0 END) AS total_pending,
+        SUM(CASE WHEN invoices.status = 'paid' THEN invoices.amount ELSE 0 END) AS total_paid
+      FROM customers
+      LEFT JOIN invoices ON customers.id = invoices.customer_id
+      WHERE customers.id = ${id}
+      GROUP BY customers.id, customers.name, customers.email, customers.image_url
+    `;
+
+    if (data.length=== 0) {
+      return null;// will trigger notFound()
+    }
+
+    const customer = data[0];
+    return {
+      ...customer,
+      total_pending:formatCurrency(customer.total_pending),
+      total_paid:formatCurrency(customer.total_paid),
+    };
+  }catch (error) {
+    // Invalid UUID (or any other DB error) → treat as not found
+    console.error('Database Error:',error);
+    return null;
+  }
+}
+
+// ─── That customer’s invoices ────────────────────────────────────────
+export async function fetchInvoicesByCustomerId(id: string) {
+  try {
+    const data = await sql<InvoicesTable[]>`
+      SELECT
+        invoices.id,
+        invoices.amount,
+        invoices.date,
+        invoices.status
+      FROM invoices
+      WHERE invoices.customer_id = ${id}
+      ORDER BY invoices.date DESC
+    `;
+
+    return data;
+  }catch (error) {
+    console.error('Database Error:',error);
+    return [];// safe fallback – empty list is better than a crash
+  }
+}
