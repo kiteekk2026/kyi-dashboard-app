@@ -126,6 +126,7 @@ import Image from 'next/image';
 import { fetchFilteredCustomers } from '@/app/lib/data';
 import { FormattedCustomersTable } from '@/app/lib/definitions';
 import Link from 'next/link';
+import { UpdateCustomer } from '@/app/ui/customers/buttons';
 
 export default async function CustomersTable({
   query, currentPage,
@@ -152,7 +153,7 @@ export default async function CustomersTable({
     <div className="mt-6 flow-root">
       <div className="overflow-x-auto">
         <div className="inline-block min-w-full align-middle">
-          <div className="overflow-hidden rounded-md bg-gray-50 p-2 md:pt-0">
+          <div className="rounded-lg bg-gray-50 p-2 md:pt-0">
             {/* Mobile view */}
             <div className="md:hidden">
               {customers.map((customer) => (
@@ -195,13 +196,17 @@ export default async function CustomersTable({
                   <div className="pt-4 text-sm">
                     <p>{customer.total_invoices} invoices</p>
                   </div>
+                  <div className="flex justify-end gap-2">
+                    <UpdateCustomer id={customer.id} />
+                    {/* <DeleteInvoice id={invoice.id} /> */}
+                  </div>
                 </div>
               ))}
             </div>
 
             {/* Desktop table */}
-            <table className="hidden min-w-full rounded-md text-gray-900 md:table">
-              <thead className="rounded-md bg-gray-50 text-left text-sm font-normal">
+            <table className="hidden min-w-full text-gray-900 md:table">
+              <thead className="rounded-lg text-left text-sm font-normal">
                 <tr>
                   <th scope="col" className="px-4 py-5 font-medium sm:pl-6">
                     Name
@@ -220,11 +225,15 @@ export default async function CustomersTable({
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 text-gray-900">
+              <tbody className="bg-white">
                 {customers.map((customer) => (
                   <tr key={customer.id} className="group">
                     <td className="whitespace-nowrap bg-white py-5 pl-4 pr-3 text-sm text-black group-first-of-type:rounded-md group-last-of-type:rounded-md sm:pl-6">
                       <div className="flex items-center gap-3">
+                      <Link
+                          href={`/dashboard/customers/${customer.id}`}
+                          className="hover:underline"
+                        >
                         <Image
                           src={customer.image_url}
                           className="rounded-full"
@@ -232,6 +241,7 @@ export default async function CustomersTable({
                           width={28}
                           height={28}
                         />
+                        </Link>
                         <Link
                           href={`/dashboard/customers/${customer.id}`}
                           className="hover:underline"
@@ -251,6 +261,11 @@ export default async function CustomersTable({
                     </td>
                     <td className="whitespace-nowrap bg-white px-4 py-5 text-sm group-first-of-type:rounded-md group-last-of-type:rounded-md">
                       {customer.total_paid}
+                    </td>
+                    <td className="whitespace-nowrap py-5 pl-4 pr-3">
+                      <div className="flex justify-end gap-3">
+                        <UpdateCustomer id={customer.id} />
+                      </div>
                     </td>
                   </tr>
                 ))}

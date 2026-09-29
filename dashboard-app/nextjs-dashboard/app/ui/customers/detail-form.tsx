@@ -1,4 +1,6 @@
 import Image from 'next/image';
+import Link from 'next/link';
+import { PencilIcon } from '@heroicons/react/24/outline';
 import InvoiceStatus from '@/app/ui/invoices/status';
 import { formatCurrency, formatDateToLocal } from '@/app/lib/utils';
 import { lusitana } from '@/app/ui/fonts';
@@ -14,20 +16,35 @@ export default function DetailCustomerForm({ customer,
 
     return (
         <>
-            {/* ── Profile header ─────────────────────────────────────────── */}
-            <div className="mb-8 flex items-center gap-4">
-                <Image
-                    src={customer.image_url}
-                    alt={`${customer.name}'s profile picture`}
-                    width={64}
-                    height={64}
-                    className="rounded-full"
-                />
-                <div>
-                    <h1 className={`${lusitana.className} text-2xl`}>{customer.name}</h1>
-                    <p className="text-sm text-gray-500">{customer.email}</p>
-                </div>
-            </div>
+            {/* Profile header */}
+      <div className="mb-8 flex items-center gap-4">
+        <Image
+          src={customer.image_url}
+          alt={`${customer.name}'s profile picture`}
+          width={64}
+          height={64}
+          className="rounded-full"
+        />
+
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h1 className={`${lusitana.className} text-2xl`}>
+              {customer.name}
+            </h1>
+
+            {/* Pencil Edit Icon */}
+            <Link
+              href={`/dashboard/customers/${customer.id}/edit`}
+              className="rounded-md border p-1.5 hover:bg-gray-100"
+              title="Edit customer"
+            >
+              <PencilIcon className="w-5" />
+            </Link>
+          </div>
+
+          <p className="text-sm text-gray-500">{customer.email}</p>
+        </div>
+      </div>
 
             {/* ── Summary stats ──────────────────────────────────────────── */}
             <div className="mb-8 grid gap-4 sm:grid-cols-3">

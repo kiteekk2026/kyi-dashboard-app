@@ -1,12 +1,15 @@
 import Form from '@/app/ui/customers/create-form';
 import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
+import {getExistingAvatars }from '@/app/lib/avatars';
 import {Metadata }from 'next';
 
 export const metadata: Metadata = {
   title:'Create Customer',
 };
 
-export default function Page() {
+export default async function Page() {
+  const existingAvatars = await getExistingAvatars();
+
   return (
     <main>
       <Breadcrumbs
@@ -19,7 +22,7 @@ export default function Page() {
           },
         ]}
       />
-      <Form />
+      <Form existingAvatars={existingAvatars} />
     </main>
   );
 }

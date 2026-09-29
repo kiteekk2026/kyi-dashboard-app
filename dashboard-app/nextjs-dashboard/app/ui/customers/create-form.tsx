@@ -21,7 +21,11 @@ const EXISTING_AVATARS = [
   '/customers/michael-novotny.png',
 ];
 
-export default function Form() {
+export default function Form({
+    existingAvatars,
+  }: {
+    existingAvatars: string[];
+  }) {
   const initialState: CustomerState = { message: null, errors: {} };
   const [state, formAction] = useActionState(createCustomer, initialState);
 
@@ -93,104 +97,103 @@ export default function Form() {
 
         {/* Avatar section */}
         <fieldset className="mb-4">
-          <legend className="mb-2 block text-sm font-medium">Avatar</legend>
+        <legend className="mb-2 block text-sm font-medium">Avatar</legend>
 
-          {/* Mode switcher */}
-          <div className="mb-4 flex gap-4">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('existing');
-                setPreview(null);
-              }}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                mode === 'existing'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              Choose existing
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('upload')}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                mode === 'upload'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              Upload new
-            </button>
-          </div>
+        {/* Mode switcher */}
+        <div className="mb-4 flex gap-4">
+          <button
+            type="button"
+            onClick={()=> {
+              setMode('existing');
+              setPreview(null);
+            }}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              mode === 'existing'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            Choose existing
+          </button>
+          <button
+            type="button"
+            onClick={()=> setMode('upload')}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              mode === 'upload'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            Upload new
+          </button>
+        </div>
 
-          {/* Existing avatars */}
-          {mode === 'existing' && (
-            <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
-              {EXISTING_AVATARS.map((src) => (
-                <label
-                  key={src}
-                  className="flex cursor-pointer flex-col items-center gap-2 rounded-md border border-gray-200 p-2 hover:bg-gray-100 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50"
-                >
-                  <input
-                    type="radio"
-                    name="image_url"
-                    value={src}
-                    className="sr-only"
-                    defaultChecked={src === EXISTING_AVATARS[0]}
-                  />
-                  <Image
-                    src={src}
-                    alt="Customer avatar"
-                    width={48}
-                    height={48}
-                    className="rounded-full"
-                  />
-                </label>
-              ))}
-            </div>
-          )}
-
-          {/* Upload new */}
-          {mode === 'upload' && (
-            <div className="flex flex-col items-start gap-3">
+        {/* Dynamic existing avatars */}
+        {mode === 'existing' && (
+          <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
+            {existingAvatars.map((src)=> (
               <label
-                htmlFor="avatar"
-                className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-600 hover:bg-gray-100"
+                key={src}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-md border border-gray-200 p-2 hover:bg-gray-100 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50"
               >
-                <PhotoIcon className="h-5 w-5" />
-                <span>Select image (PNG / JPG)</span>
+                <input
+                  type="radio"
+                  name="image_url"
+                  value={src}
+                  className="sr-only"
+                  defaultChecked={src === existingAvatars[0]}
+                />
+                <Image
+                  src={src}
+                  alt="Customer avatar"
+                  width={48}
+                  height={48}
+                  className="rounded-full"
+                />
               </label>
-              <input
-                id="avatar"
-                name="avatar"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-
-              {preview && (
-                <div className="mt-2">
-                  <p className="mb-1 text-xs text-gray-500">Preview:</p>
-                  <img
-                    src={preview}
-                    alt="Preview"
-                    className="h-16 w-16 rounded-full object-cover"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          <div id="image_url-error" aria-live="polite" aria-atomic="true">
-            {state.errors?.image_url?.map((error) => (
-              <p className="mt-2 text-sm text-red-500" key={error}>
-                {error}
-              </p>
             ))}
           </div>
-        </fieldset>
+        )}
+
+        {/* Upload new – same as before */}
+        {mode === 'upload' && (
+          <div className="flex flex-col items-start gap-3">
+            <label
+              htmlFor="avatar"
+              className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-600 hover:bg-gray-100"
+            >
+              <PhotoIcon className="h-5 w-5" />
+              <span>Select image (PNG / JPG)</span>
+            </label>
+            <input
+              id="avatar"
+              name="avatar"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            {preview && (
+              <div className="mt-2">
+                <p className="mb-1 text-xs text-gray-500">Preview:</p>
+                <img
+                  src={preview}
+                  alt="Preview"
+                  className="h-16 w-16 rounded-full object-cover"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        <div id="image_url-error" aria-live="polite" aria-atomic="true">
+          {state.errors?.image_url?.map((error)=> (
+            <p className="mt-2 text-sm text-red-500" key={error}>
+              {error}
+            </p>
+          ))}
+        </div>
+      </fieldset>
 
         {/* Form-level message */}
         <div aria-live="polite" aria-atomic="true">
