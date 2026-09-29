@@ -126,7 +126,7 @@ import Image from 'next/image';
 import { fetchFilteredCustomers } from '@/app/lib/data';
 import { FormattedCustomersTable } from '@/app/lib/definitions';
 import Link from 'next/link';
-import { UpdateCustomer } from '@/app/ui/customers/buttons';
+import { UpdateCustomer, DeleteCustomer } from '@/app/ui/customers/buttons';
 
 export default async function CustomersTable({
   query, currentPage,
@@ -198,7 +198,7 @@ export default async function CustomersTable({
                   </div>
                   <div className="flex justify-end gap-2">
                     <UpdateCustomer id={customer.id} />
-                    {/* <DeleteInvoice id={invoice.id} /> */}
+                    <DeleteCustomer id={customer.id} name={customer.name} />
                   </div>
                 </div>
               ))}
@@ -265,6 +265,7 @@ export default async function CustomersTable({
                     <td className="whitespace-nowrap py-5 pl-4 pr-3">
                       <div className="flex justify-end gap-3">
                         <UpdateCustomer id={customer.id} />
+                        <DeleteCustomer id={customer.id} name={customer.name} />
                       </div>
                     </td>
                   </tr>

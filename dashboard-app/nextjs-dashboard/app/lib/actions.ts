@@ -410,3 +410,114 @@ export async function updateCustomer(
   revalidatePath(`/dashboard/customers/${id}`);// detail page too
   redirect('/dashboard/customers');
 }
+
+
+// export async function deleteCustomer(id: string) {
+//   // 1. Check pending invoices
+//   const pending = await sql`
+//     SELECT COUNT(*)::int AS count
+//     FROM invoices
+//     WHERE customer_id = ${id} AND status = 'pending'
+//   `;
+
+//   const pendingCount = pending[0]?.count ?? 0;
+
+//   if (pendingCount > 0) {
+//     // Throw so the form does not stay in a weird state.
+//     // You can later catch this with an error.tsx or a toast.
+//     throw new Error(
+//       `Cannot delete this customer. They still have ${pendingCount} pending invoice${pendingCount === 1 ? '' : 's'}.`,
+//     );
+//   }
+
+//   // 2. Archive + delete in one transaction
+//   try {
+//     await sql.begin(async (sql) => {
+//       await sql`
+//         INSERT INTO customers_history (id, name, email, image_url)
+//         SELECT id, name, email, image_url
+//         FROM customers
+//         WHERE id = ${id}
+//       `;
+
+//       await sql`
+//         INSERT INTO invoices_history (id, customer_id, amount, status, date)
+//         SELECT id, customer_id, amount, status, date
+//         FROM invoices
+//         WHERE customer_id = ${id}
+//       `;
+
+//       await sql`
+//         DELETE FROM invoices
+//         WHERE customer_id = ${id}
+//       `;
+
+//       await sql`
+//         DELETE FROM customers
+//         WHERE id = ${id}
+//       `;
+//     });
+//   } catch (error) {
+//     console.error('Delete customer error:', error);
+//     throw new Error('Database Error: Failed to delete customer.');
+//   }
+
+//   revalidatePath('/dashboard/customers');
+//   redirect('/dashboard/customers');
+// }
+
+export async function deleteCustomer(id: string) {
+  // 1. Check pending invoices
+  const pending = await sql`
+    SELECT COUNT(*)::int AS count
+    FROM invoices
+    WHERE customer_id = ${id} AND status = 'pending'
+  `;
+
+  const pendingCount = pending[0]?.count ?? 0;
+
+  if (pendingCount > 0) {
+    return {
+      success: false,
+      message: `Cannot delete this customer. They still have ${pendingCount} pending invoice${pendingCount === 1 ? '' : 's'}.`,
+    };
+  }
+
+  // 2. Archive + delete in one transaction
+  try {
+    await sql.begin(async (sql) => {
+      await sql`
+        INSERT INTO customers_history (id, name, email, image_url)
+        SELECT id, name, email, image_url
+        FROM customers
+        WHERE id = ${id}
+      `;
+
+      await sql`
+        INSERT INTO invoices_history (id, customer_id, amount, status, date)
+        SELECT id, customer_id, amount, status, date
+        FROM invoices
+        WHERE customer_id = ${id}
+      `;
+
+      await sql`
+        DELETE FROM invoices
+        WHERE customer_id = ${id}
+      `;
+
+      await sql`
+        DELETE FROM customers
+        WHERE id = ${id}
+      `;
+    });
+  } catch (error) {
+    console.error('Delete customer error:', error);
+    return {
+      success: false,
+      message: 'Database Error: Failed to delete customer.',
+    };
+  }
+
+  revalidatePath('/dashboard/customers');
+  return { success: true };
+}

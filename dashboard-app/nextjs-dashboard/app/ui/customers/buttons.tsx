@@ -1,5 +1,11 @@
-import {PencilIcon, PlusIcon }from '@heroicons/react/24/outline';
+'use client';
+
+import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { deleteCustomer } from '@/app/lib/actions';
+import { useRouter } from 'next/navigation';
+import { useTransition } from 'react';
+
 
 export function CreateCustomer() {
 
@@ -22,5 +28,67 @@ export function CreateCustomer() {
       >
         <PencilIcon className="w-5" />
       </Link>
+    );
+  }
+
+//   export function DeleteCustomer({ id }: { id: string }) {
+//     const deleteCustomerWithId = deleteCustomer.bind(null, id);
+  
+//     return (
+//       <form action={deleteCustomerWithId}>
+//         <button
+//           type="submit"
+//           className="rounded-md border p-2 hover:bg-gray-100"
+//           title="Delete customer"
+//         >
+//           <span className="sr-only">Delete</span>
+//           <TrashIcon className="w-5" />
+//         </button>
+//       </form>
+//     );
+//   }
+
+export function DeleteCustomer({
+    id,
+    name,
+  }: {
+    id: string;
+    name: string;
+  }) {
+    const router = useRouter();
+    const [isPending, startTransition] = useTransition();
+  
+    async function handleDelete() {
+      const confirmed = window.confirm(
+        `Do you want to delete "${name}"?\n`,
+      );
+  
+      if (!confirmed) return;
+  
+      startTransition(async () => {
+        const result = await deleteCustomer(id);
+  
+        if (!result.success) {
+          // Friendly popup instead of the crazy error page
+          window.alert(result.message);
+          return;
+        }
+  
+        // Success → refresh the list
+        router.refresh();
+      });
+    }
+  
+    return (
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={isPending}
+        className="rounded-md border p-2 hover:bg-gray-100 disabled:opacity-50"
+        title="Delete customer"
+      >
+        <span className="sr-only">Delete</span>
+        <TrashIcon className="w-5" />
+      </button>
     );
   }
