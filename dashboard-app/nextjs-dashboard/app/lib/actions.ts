@@ -266,7 +266,7 @@ const CustomerFormSchema = z.object({
     .string()
     .email({ message: 'Please enter a valid email.' })
     .max(100, { message: 'Email is too long.' }),
-  image_url: z.string().optional(),
+  // image_url: z.string().optional(),
 });
 
 // export type CustomerState = {
@@ -325,7 +325,7 @@ export async function createCustomer(
   const raw = {
     name: formData.get('name'),
     email: formData.get('email'),
-    image_url: formData.get('image_url'),
+    // image_url: formData.get('image_url'),
   };
 
   const validated = CustomerFormSchema.safeParse(raw);
@@ -337,7 +337,7 @@ export async function createCustomer(
       values: {
         name: String(raw.name ?? ''),
         email: String(raw.email ?? ''),
-        image_url: String(raw.image_url ?? ''),
+        // image_url: String(raw.image_url ?? ''),
       },
     };
   }
@@ -488,7 +488,7 @@ export async function updateCustomer(
   const raw = {
     name: formData.get('name'),
     email: formData.get('email'),
-    image_url: formData.get('image_url'),
+    // image_url: formData.get('image_url'),
   };
 
   const validated = CustomerFormSchema.safeParse(raw);
@@ -500,7 +500,7 @@ export async function updateCustomer(
       values: {
         name: String(raw.name ?? ''),
         email: String(raw.email ?? ''),
-        image_url: String(raw.image_url ?? ''),
+        // image_url: String(raw.image_url ?? ''),
       },
     };
   }
