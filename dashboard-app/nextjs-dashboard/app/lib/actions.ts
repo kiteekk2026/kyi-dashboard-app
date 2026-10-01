@@ -14,6 +14,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { getExistingAvatars } from '@/app/lib/avatars';
+import {uploadCustomerAvatar }from '@/app/lib/blob';
 
 import {
   CustomerErrorCode
@@ -342,71 +343,109 @@ export async function createCustomer(
     };
   }
 
-
-
-  // 2. Resolve the image
   let image_url: string | null = null;
 
-  const existing = formData.get('image_url') as string | null;
-  const file = formData.get('avatar') as File | null;
+const existing = formData.get('image_url');
+const file = formData.get('avatar');
 
-  if (file && file.size > 0) {
-    // ----- Upload path -----
-    // Basic safety checks
-    if (!file.type.startsWith('image/')) {
-      return {
-        errors: { image_url: ['Only image files are allowed.'] },
-        message: 'Invalid file type.',
-      };
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      // 2 MB limit
-      return {
-        errors: { image_url: ['Image must be smaller than 2 MB.'] },
-        message: 'File too large.',
-      };
-    }
+const hasFile =
+  file &&
+  typeof file === 'object' &&
+  'size' in file &&
+  (file as File).size > 0;
 
-    try {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-
-      // Ensure directory exists
-      const uploadDir = path.join(process.cwd(), 'public', 'customers');
-      await mkdir(uploadDir, { recursive: true });
-
-      // Unique filename
-      const ext = path.extname(file.name) || '.png';
-      const shortId = randomUUID().replace(/-/g, "").slice(0, 10);
-      const filename = `${shortId}${ext}`;
-      const filepath = path.join(uploadDir, filename);
-
-      await writeFile(filepath, buffer);
-      image_url = `/customers/${filename}`;
-    } catch (err) {
-      console.error('Upload error:', err);
-      return {
-        message: 'Failed to upload image.',
-      };
-    }
-  } else if (existing) {
-    // ----- Dynamic existing avatar check -----
-    const allowed = await getExistingAvatars();
-
-    if (allowed.includes(existing)) {
-      image_url = existing;
-    } else {
-      return {
-        errors: { image_url: ['Selected avatar is not allowed.'] },
-        message: 'Invalid avatar.',
-      };
-    }
-  } else {
+if (hasFile) {
+  try {
+    image_url = await uploadCustomerAvatar(file as File);
+  }catch (err) {
+    console.error('Upload error:',err);
     return {
-      errors: { image_url: ['Please select or upload an avatar.'] },
-      message: 'Missing avatar.',
+      message:
+        err instanceof Error ? err.message : 'Failed to upload image.',
+      values: {
+        name: String(raw.name ?? ''),
+        email: String(raw.email ?? ''),
+      },
+      errors: { image_url: ['Failed to upload image.'] },
     };
   }
+}else if (typeof existing === 'string' && existing.length> 0) {
+  // Existing static assets still OK: /customers/amy-burns.png
+  image_url = existing;
+}else {
+  return {
+    errors: { image_url: ['Please select or upload an avatar.'] },
+    message:'Missing or invalid fields. Failed to create customer.',
+    values: {
+      name: String(raw.name ?? ''),
+      email: String(raw.email ?? ''),
+    },
+  };
+}
+
+  // 2. Resolve the image
+  // let image_url: string | null = null;
+
+  // const existing = formData.get('image_url') as string | null;
+  // const file = formData.get('avatar') as File | null;
+
+  // if (file && file.size > 0) {
+  //   // ----- Upload path -----
+  //   // Basic safety checks
+  //   if (!file.type.startsWith('image/')) {
+  //     return {
+  //       errors: { image_url: ['Only image files are allowed.'] },
+  //       message: 'Invalid file type.',
+  //     };
+  //   }
+  //   if (file.size > 2 * 1024 * 1024) {
+  //     // 2 MB limit
+  //     return {
+  //       errors: { image_url: ['Image must be smaller than 2 MB.'] },
+  //       message: 'File too large.',
+  //     };
+  //   }
+
+  //   try {
+  //     const bytes = await file.arrayBuffer();
+  //     const buffer = Buffer.from(bytes);
+
+  //     // Ensure directory exists
+  //     const uploadDir = path.join(process.cwd(), 'public', 'customers');
+  //     await mkdir(uploadDir, { recursive: true });
+
+  //     // Unique filename
+  //     const ext = path.extname(file.name) || '.png';
+  //     const shortId = randomUUID().replace(/-/g, "").slice(0, 10);
+  //     const filename = `${shortId}${ext}`;
+  //     const filepath = path.join(uploadDir, filename);
+
+  //     await writeFile(filepath, buffer);
+  //     image_url = `/customers/${filename}`;
+  //   } catch (err) {
+  //     console.error('Upload error:', err);
+  //     return {
+  //       message: 'Failed to upload image.',
+  //     };
+  //   }
+  // } else if (existing) {
+  //   // ----- Dynamic existing avatar check -----
+  //   const allowed = await getExistingAvatars();
+
+  //   if (allowed.includes(existing)) {
+  //     image_url = existing;
+  //   } else {
+  //     return {
+  //       errors: { image_url: ['Selected avatar is not allowed.'] },
+  //       message: 'Invalid avatar.',
+  //     };
+  //   }
+  // } else {
+  //   return {
+  //     errors: { image_url: ['Please select or upload an avatar.'] },
+  //     message: 'Missing avatar.',
+  //   };
+  // }
 
   // 3. Insert into database
   //   try {
