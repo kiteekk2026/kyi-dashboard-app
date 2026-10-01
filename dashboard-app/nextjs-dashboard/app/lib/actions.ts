@@ -84,7 +84,7 @@ export async function createInvoice(prevState: State, formData: FormData) {
     }
   }
 
-
+  revalidatePath('/dashboard', 'layout');
   revalidatePath('/dashboard/invoices');
   redirect('/dashboard/invoices');
 }
@@ -123,7 +123,7 @@ export async function updateInvoice(id: string, prevState: State, formData: Form
     return { message: 'Database Error: Failed to Update Invoice.' };
   }
 
-
+  revalidatePath('/dashboard', 'layout');
   revalidatePath('/dashboard/invoices');
   redirect('/dashboard/invoices');
 }
@@ -132,6 +132,8 @@ export async function deleteInvoice(id: string) {
   // throw new Error('Failed to Delete Invoice');
 
   await sql`DELETE FROM invoices WHERE id = ${id}`;
+
+  revalidatePath('/dashboard', 'layout');
   revalidatePath('/dashboard/invoices');
 }
 
@@ -340,7 +342,7 @@ export async function createCustomer(
     };
   }
 
-  
+
 
   // 2. Resolve the image
   let image_url: string | null = null;
@@ -453,6 +455,8 @@ export async function createCustomer(
     };
   }
 
+  revalidatePath('/dashboard', 'layout');
+  revalidatePath('/dashboard/customers', 'layout');
   revalidatePath('/dashboard/customers');
   redirect('/dashboard/customers');
 }
@@ -501,7 +505,7 @@ export async function updateCustomer(
     };
   }
 
-  
+
 
   // 2. Resolve image (same logic as createCustomer)
   let image_url: string | null = null;
@@ -587,6 +591,8 @@ export async function updateCustomer(
       ? returnToRaw
       : '/dashboard/customers';
 
+  revalidatePath('/dashboard', 'layout');
+  revalidatePath('/dashboard/customers', 'layout');
   revalidatePath('/dashboard/customers');
   revalidatePath(`/dashboard/customers/${id}`);// detail page too
   // redirect('/dashboard/customers');
@@ -700,6 +706,8 @@ export async function deleteCustomer(id: string) {
     };
   }
 
+  revalidatePath('/dashboard', 'layout');
+  revalidatePath('/dashboard/customers', 'layout');
   revalidatePath('/dashboard/customers');
   return { success: true };
 }
