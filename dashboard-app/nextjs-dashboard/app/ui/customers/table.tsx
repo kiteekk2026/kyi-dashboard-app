@@ -129,10 +129,10 @@ import Link from 'next/link';
 import { UpdateCustomer, DeleteCustomer } from '@/app/ui/customers/buttons';
 
 export default async function CustomersTable({
-  query, currentPage,
+  query, currentPage, returnTo,
 }: {
   query: string;
-  currentPage: number;
+  currentPage: number; returnTo: string;
 }) {
   const customers = await fetchFilteredCustomers(query, currentPage);
 
@@ -197,7 +197,7 @@ export default async function CustomersTable({
                     <p>{customer.total_invoices} invoices</p>
                   </div>
                   <div className="flex justify-end gap-2">
-                    <UpdateCustomer id={customer.id} />
+                    <UpdateCustomer id={customer.id} returnTo={returnTo} />
                     <DeleteCustomer id={customer.id} name={customer.name} />
                   </div>
                 </div>
@@ -230,17 +230,17 @@ export default async function CustomersTable({
                   <tr key={customer.id} className="group">
                     <td className="whitespace-nowrap bg-white py-5 pl-4 pr-3 text-sm text-black group-first-of-type:rounded-md group-last-of-type:rounded-md sm:pl-6">
                       <div className="flex items-center gap-3">
-                      <Link
+                        <Link
                           href={`/dashboard/customers/${customer.id}`}
                           className="hover:underline"
                         >
-                        <Image
-                          src={customer.image_url}
-                          className="rounded-full"
-                          alt={`${customer.name}'s profile picture`}
-                          width={28}
-                          height={28}
-                        />
+                          <Image
+                            src={customer.image_url}
+                            className="rounded-full"
+                            alt={`${customer.name}'s profile picture`}
+                            width={28}
+                            height={28}
+                          />
                         </Link>
                         <Link
                           href={`/dashboard/customers/${customer.id}`}
@@ -264,7 +264,7 @@ export default async function CustomersTable({
                     </td>
                     <td className="whitespace-nowrap py-5 pl-4 pr-3">
                       <div className="flex justify-end gap-3">
-                        <UpdateCustomer id={customer.id} />
+                        <UpdateCustomer id={customer.id} returnTo={returnTo} />
                         <DeleteCustomer id={customer.id} name={customer.name} />
                       </div>
                     </td>

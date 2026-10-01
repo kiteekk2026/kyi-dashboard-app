@@ -9,7 +9,7 @@ import {
 import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import { Button } from '@/app/ui/button';
 import { useActionState } from 'react';
-import { authenticate, signInWithGithub} from '@/app/lib/actions';
+import { authenticate, signInWithGithub, signInWithGoogle} from '@/app/lib/actions';
 import { useSearchParams } from 'next/navigation';
 
 export default function LoginForm() {
@@ -96,6 +96,13 @@ export default function LoginForm() {
           Continue with GitHub
         </button>
       </form>
+      {/* Google OAuth Form */}
+      <form action={signInWithGoogle}>
+          <input type="hidden" name="redirectTo" value={callbackUrl} />
+          <button className="flex h-10 w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
+            Continue with Google
+          </button>
+        </form>
     </>
   );
 }

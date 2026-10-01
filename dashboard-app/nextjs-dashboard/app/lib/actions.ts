@@ -10,12 +10,18 @@ import sql from '@/app/lib/db'
 // import { AuthError } from 'next-auth';
 import { headers } from 'next/headers';
 import { createClient } from '@/app/lib/supabase/server';
-import {writeFile,mkdir }from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
-import {randomUUID }from 'crypto';
-import {getExistingAvatars }from '@/app/lib/avatars';
+import { randomUUID } from 'crypto';
+import { getExistingAvatars } from '@/app/lib/avatars';
+
+import {
+  CustomerErrorCode
+} from '@/app/lib/customer-errors';
 
 // const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+
+
 
 const FormSchema = z.object({
   id: z.string(),
@@ -24,10 +30,10 @@ const FormSchema = z.object({
   }),
   amount: z.coerce.number().gt(0, { message: 'Please enter an amount greater than $0.' }),
   status: z.enum(['pending', 'paid'], {
-  invalid_type_error: 'Please select an invoice status.',
-}),
+    invalid_type_error: 'Please select an invoice status.',
+  }),
   date: z.string(),
-    description: z.string(),
+  description: z.string(),
 });
 
 const CreateInvoice = FormSchema.omit({ id: true, date: true });
@@ -84,7 +90,7 @@ export async function createInvoice(prevState: State, formData: FormData) {
 }
 
 export async function updateInvoice(id: string, prevState: State, formData: FormData) {
-  const validatedFields  = UpdateInvoice.safeParse({
+  const validatedFields = UpdateInvoice.safeParse({
     customerId: formData.get('customerId'),
     amount: formData.get('amount'),
     status: formData.get('status'),
@@ -95,14 +101,14 @@ export async function updateInvoice(id: string, prevState: State, formData: Form
   //   amount: formData.get('amount'),
   //   status: formData.get('status'),
   // });
- 
+
   if (!validatedFields.success) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
       message: 'Missing Fields. Failed to Update Invoice.',
     };
   }
- 
+
   const { customerId, amount, status, description } = validatedFields.data;
   const amountInCents = amount * 100;
   try {
@@ -196,26 +202,26 @@ export async function signInWithGithub(formData: FormData) {
 }
 
 //########## Google ###################
-// export async function signInWithGoogle(formData: FormData) {
-//   const origin = (await headers()).get('origin');
-//   const next = safeRedirectPath(formData.get('redirectTo'));
+export async function signInWithGoogle(formData: FormData) {
+  const origin = (await headers()).get('origin');
+  const next = safeRedirectPath(formData.get('redirectTo'));
 
-//   const supabase = await createClient();
-//   const { data, error } = await supabase.auth.signInWithOAuth({
-//     provider: 'google',
-//     options: {
-//       redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
-//       queryParams: {
-//         access_type: 'offline',
-//         prompt: 'consent',
-//       },
-//     },
-//   });
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
+    },
+  });
 
-//   if (error || !data.url) redirect('/login?error=oauth');
+  if (error || !data.url) redirect('/login?error=oauth');
 
-//   redirect(data.url);
-// }
+  redirect(data.url);
+}
 
 export async function signOut() {
   const supabase = await createClient();
@@ -230,47 +236,117 @@ const ALLOWED_EXISTING = [
   '/customers/evil-rabbit.png',
   '/customers/lee-robinson.png',
   '/customers/michael-novotny.png',
-]as const;
+] as const;
+
+// const CustomerFormSchema = z.object({
+//   name:z.string().min(1, { message:'Please enter a name.' }),
+//   email:z.string().email({ message:'Please enter a valid email.' }),
+//   image_url:z.string().optional(),// will be filled by us
+// });
+
+// export type CustomerState = {
+//   errors?: {
+//     name?: string[];
+//     email?: string[];
+//     image_url?: string[];
+//   };
+//   message?: string | null;
+// };
+
+//Shared validation State + Zod schema
 
 const CustomerFormSchema = z.object({
-  name:z.string().min(1, { message:'Please enter a name.' }),
-  email:z.string().email({ message:'Please enter a valid email.' }),
-  image_url:z.string().optional(),// will be filled by us
+  name: z
+    .string()
+    .min(3, { message: 'Please enter a name.' })
+    .max(100, { message: 'Name is too long.' }),
+  email: z
+    .string()
+    .email({ message: 'Please enter a valid email.' })
+    .max(100, { message: 'Email is too long.' }),
+  image_url: z.string().optional(),
 });
+
+// export type CustomerState = {
+//   errors?: {
+//     name?: string[];
+//     email?: string[];
+//     image_url?: string[];
+//   };
+//   message?: string | null;
+//   // Preserve user input on failure
+//   values?: {
+//     name?: string;
+//     email?: string;
+//     image_url?: string;
+//   };
+// };
 
 export type CustomerState = {
   errors?: {
-    name?: string[];
+    name?: string[];       // still useful for field-level codes
     email?: string[];
     image_url?: string[];
   };
+  /** Stable machine-readable codes */
+  errorCodes?: CustomerErrorCode[];
   message?: string | null;
+  values?: {
+    name?: string;
+    email?: string;
+    image_url?: string;
+  };
 };
 
+// export async function createCustomer(
+//   prevState: CustomerState,
+//   formData: FormData,
+// ) {
+//   // 1. Basic field validation
+//   const validatedFields = CustomerFormSchema.safeParse({
+//     name:formData.get('name'),
+//     email:formData.get('email'),
+//   });
+
+//   if (!validatedFields.success) {
+//     return {
+//       errors:validatedFields.error.flatten().fieldErrors,
+//       message:'Missing Fields. Failed to Create Customer.',
+//     };
+//   }
+
+//   const {name,email }= validatedFields.data;
 export async function createCustomer(
   prevState: CustomerState,
   formData: FormData,
-) {
-  // 1. Basic field validation
-  const validatedFields = CustomerFormSchema.safeParse({
-    name:formData.get('name'),
-    email:formData.get('email'),
-  });
+): Promise<CustomerState> {
+  const raw = {
+    name: formData.get('name'),
+    email: formData.get('email'),
+    image_url: formData.get('image_url'),
+  };
 
-  if (!validatedFields.success) {
+  const validated = CustomerFormSchema.safeParse(raw);
+
+  if (!validated.success) {
     return {
-      errors:validatedFields.error.flatten().fieldErrors,
-      message:'Missing Fields. Failed to Create Customer.',
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Missing or invalid fields. Failed to create customer.',
+      values: {
+        name: String(raw.name ?? ''),
+        email: String(raw.email ?? ''),
+        image_url: String(raw.image_url ?? ''),
+      },
     };
   }
 
-  const {name,email }= validatedFields.data;
+  
 
   // 2. Resolve the image
   let image_url: string | null = null;
 
-  const existing = formData.get('image_url')as string | null;
-  const file = formData.get('avatar')as File | null;
+  const existing = formData.get('image_url') as string | null;
+  const file = formData.get('avatar') as File | null;
 
   if (file && file.size > 0) {
     // ----- Upload path -----
@@ -278,14 +354,14 @@ export async function createCustomer(
     if (!file.type.startsWith('image/')) {
       return {
         errors: { image_url: ['Only image files are allowed.'] },
-        message:'Invalid file type.',
+        message: 'Invalid file type.',
       };
     }
     if (file.size > 2 * 1024 * 1024) {
       // 2 MB limit
       return {
         errors: { image_url: ['Image must be smaller than 2 MB.'] },
-        message:'File too large.',
+        message: 'File too large.',
       };
     }
 
@@ -294,51 +370,86 @@ export async function createCustomer(
       const buffer = Buffer.from(bytes);
 
       // Ensure directory exists
-      const uploadDir = path.join(process.cwd(),'public','customers');
-      await mkdir(uploadDir, { recursive:true });
+      const uploadDir = path.join(process.cwd(), 'public', 'customers');
+      await mkdir(uploadDir, { recursive: true });
 
       // Unique filename
-      const ext = path.extname(file.name)|| '.png';
+      const ext = path.extname(file.name) || '.png';
       const shortId = randomUUID().replace(/-/g, "").slice(0, 10);
       const filename = `${shortId}${ext}`;
-      const filepath = path.join(uploadDir,filename);
+      const filepath = path.join(uploadDir, filename);
 
-      await writeFile(filepath,buffer);
+      await writeFile(filepath, buffer);
       image_url = `/customers/${filename}`;
-    }catch (err) {
-      console.error('Upload error:',err);
+    } catch (err) {
+      console.error('Upload error:', err);
       return {
-        message:'Failed to upload image.',
+        message: 'Failed to upload image.',
       };
     }
-  }else if (existing) {
+  } else if (existing) {
     // ----- Dynamic existing avatar check -----
     const allowed = await getExistingAvatars();
 
     if (allowed.includes(existing)) {
       image_url = existing;
-    }else {
+    } else {
       return {
         errors: { image_url: ['Selected avatar is not allowed.'] },
-        message:'Invalid avatar.',
+        message: 'Invalid avatar.',
       };
     }
-  }else {
+  } else {
     return {
       errors: { image_url: ['Please select or upload an avatar.'] },
-      message:'Missing avatar.',
+      message: 'Missing avatar.',
     };
   }
 
   // 3. Insert into database
+  //   try {
+  //     await sql`
+  //       INSERT INTO customers (name, email, image_url)
+  //       VALUES (${name}, ${email}, ${image_url})
+  //     `;
+  //   }catch (error) {
+  //     return {
+  //       message:'Database Error: Failed to Create Customer.',
+  //     };
+  //   }
+
+  //   revalidatePath('/dashboard/customers');
+  //   redirect('/dashboard/customers');
+  // }
   try {
     await sql`
-      INSERT INTO customers (name, email, image_url)
-      VALUES (${name}, ${email}, ${image_url})
-    `;
-  }catch (error) {
+    INSERT INTO customers (name, email, image_url)
+    VALUES (${validated.data.name}, ${validated.data.email}, ${image_url})
+  `;
+  } catch (error: any) {
+    // Postgres unique_violation
+    if (error?.code === '23505') {
+      return {
+        errors: { email: [CustomerErrorCode.EMAIL_TAKEN] },
+        errorCodes: [CustomerErrorCode.EMAIL_TAKEN],
+        message: CustomerErrorCode.EMAIL_TAKEN, // or keep a short fallback
+        values: {
+          name: validated.data.name,
+          email: validated.data.email,
+          image_url: image_url ?? undefined,
+        },
+      };
+    }
+
     return {
-      message:'Database Error: Failed to Create Customer.',
+      errors: {},
+      errorCodes: [CustomerErrorCode.DATABASE_ERROR],
+      message: CustomerErrorCode.DATABASE_ERROR,
+      values: {
+        name: validated.data.name,
+        email: validated.data.email,
+        image_url: image_url ?? undefined,
+      },
     };
   }
 
@@ -346,46 +457,72 @@ export async function createCustomer(
   redirect('/dashboard/customers');
 }
 
+// export async function updateCustomer(
+//   id: string,
+//   prevState: CustomerState,
+//   formData: FormData,
+// ) {
+//   // 1. Validate name + email (same rules as create)
+//   const validatedFields = CustomerFormSchema.safeParse({
+//     name:formData.get('name'),
+//     email:formData.get('email'),
+//   });
+
+//   if (!validatedFields.success) {
+//     return {
+//       errors:validatedFields.error.flatten().fieldErrors,
+//       message:'Missing Fields. Failed to Update Customer.',
+//     };
+//   }
+
+//   const {name,email }= validatedFields.data;
 export async function updateCustomer(
   id: string,
   prevState: CustomerState,
   formData: FormData,
-) {
-  // 1. Validate name + email (same rules as create)
-  const validatedFields = CustomerFormSchema.safeParse({
-    name:formData.get('name'),
-    email:formData.get('email'),
-  });
+): Promise<CustomerState> {
+  const raw = {
+    name: formData.get('name'),
+    email: formData.get('email'),
+    image_url: formData.get('image_url'),
+  };
 
-  if (!validatedFields.success) {
+  const validated = CustomerFormSchema.safeParse(raw);
+
+  if (!validated.success) {
     return {
-      errors:validatedFields.error.flatten().fieldErrors,
-      message:'Missing Fields. Failed to Update Customer.',
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Missing or invalid fields. Failed to create customer.',
+      values: {
+        name: String(raw.name ?? ''),
+        email: String(raw.email ?? ''),
+        image_url: String(raw.image_url ?? ''),
+      },
     };
   }
 
-  const {name,email }= validatedFields.data;
+  
 
   // 2. Resolve image (same logic as createCustomer)
   let image_url: string | null = null;
 
-  const existing = formData.get('image_url')as string | null;
-  const file = formData.get('avatar')as File | null;
+  const existing = formData.get('image_url') as string | null;
+  const file = formData.get('avatar') as File | null;
 
   if (file && file.size > 0) {
     // upload logic (identical to create)
     // … size/type checks, writeFile, set image_url …
-  }else if (existing) {
+  } else if (existing) {
     const allowed = await getExistingAvatars();
     if (allowed.includes(existing)) {
       image_url = existing;
-    }else {
+    } else {
       return {
         errors: { image_url: ['Selected avatar is not allowed.'] },
-        message:'Invalid avatar.',
+        message: 'Invalid avatar.',
       };
     }
-  }else {
+  } else {
     // Keep the current avatar if the user didn’t change it
     // (you can also fetch the current value if you prefer)
     image_url = existing;// will be null only if nothing was sent
@@ -396,19 +533,64 @@ export async function updateCustomer(
   // For brevity we assume the form always sends one.
 
   // 3. Update the row
+  //   try {
+  //     await sql`
+  //       UPDATE customers
+  //       SET name = ${name}, email = ${email}, image_url = ${image_url}
+  //       WHERE id = ${id}
+  //     `;
+  //   }catch (error) {
+  //     return { message:'Database Error: Failed to Update Customer.' };
+  //   }
+
+  //   revalidatePath('/dashboard/customers');
+  //   revalidatePath(`/dashboard/customers/${id}`);// detail page too
+  //   redirect('/dashboard/customers');
+  // }
   try {
     await sql`
-      UPDATE customers
-      SET name = ${name}, email = ${email}, image_url = ${image_url}
-      WHERE id = ${id}
-    `;
-  }catch (error) {
-    return { message:'Database Error: Failed to Update Customer.' };
+        UPDATE customers
+        SET name = ${validated.data.name}, email = ${validated.data.email}, image_url = ${image_url}
+        WHERE id = ${id}
+      `;
+
+  } catch (error: any) {
+    // Postgres unique_violation
+    if (error?.code === '23505') {
+      return {
+        errors: { email: [CustomerErrorCode.EMAIL_TAKEN] },
+        errorCodes: [CustomerErrorCode.EMAIL_TAKEN],
+        message: CustomerErrorCode.EMAIL_TAKEN, // or keep a short fallback
+        values: {
+          name: validated.data.name,
+          email: validated.data.email,
+          image_url: image_url ?? undefined,
+        },
+      };
+    }
+
+    return {
+      errors: {},
+      errorCodes: [CustomerErrorCode.DATABASE_ERROR],
+      message: CustomerErrorCode.DATABASE_ERROR,
+      values: {
+        name: validated.data.name,
+        email: validated.data.email,
+        image_url: image_url ?? undefined,
+      },
+    };
   }
+
+  const returnToRaw = formData.get('returnTo');
+  const returnTo =
+    typeof returnToRaw === 'string' && returnToRaw.startsWith('/dashboard/customers')
+      ? returnToRaw
+      : '/dashboard/customers';
 
   revalidatePath('/dashboard/customers');
   revalidatePath(`/dashboard/customers/${id}`);// detail page too
-  redirect('/dashboard/customers');
+  // redirect('/dashboard/customers');
+  redirect(returnTo);
 }
 
 
