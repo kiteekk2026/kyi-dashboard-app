@@ -1,60 +1,114 @@
 import Form from '@/app/ui/customers/edit-form';
 import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
-import {fetchCustomerById }from '@/app/lib/data';
-import {getExistingAvatars }from '@/app/lib/avatars';
-import {notFound }from 'next/navigation';
-import {Metadata }from 'next';
-import {listMediaAssets,listMediaFolders }from '@/app/lib/media';
+import { fetchCustomerById } from '@/app/lib/data';
+import { listMediaAssetsFirstPage } from '@/app/lib/media';
+import { notFound } from 'next/navigation';
+import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title:'Edit Customer',
+  title: 'Edit Customer',
 };
 
 export default async function Page(props: {
-    params: Promise<{id: string }>;
-    searchParams?: Promise<{returnTo?: string }>;
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ returnTo?: string }>;
 }) {
-    const {id }= await props.params;
-    const searchParams = await props.searchParams;
-    const returnTo = searchParams?.returnTo || '/dashboard/customers';
+  const { id } = await props.params;
+  const searchParams = await props.searchParams;
+  const returnTo = searchParams?.returnTo || '/dashboard/customers';
 
-    const [{items,totalPages },folders]= await Promise.all([
-        listMediaAssets({ page:1, folder:'customers' }),
-        listMediaFolders(),
-      ]);
-
-      const isAdmin = false;// replace with real role check
-
-  const [customer,existingAvatars]= await Promise.all([
+  const [customer, media] = await Promise.all([
     fetchCustomerById(id),
-    getExistingAvatars(),
+    listMediaAssetsFirstPage(12),
   ]);
 
   if (!customer) {
     notFound();
   }
 
+  const isAdmin = false; // replace with real RBAC later
+
   return (
     <main>
       <Breadcrumbs
         breadcrumbs={[
-          { label:'Customers', href:'/dashboard/customers' },
+          { label: 'Customers', href: '/dashboard/customers' },
           {
-            label:'Edit Customer',
-            href:`/dashboard/customers/${id}/edit`,
-            active:true,
+            label: 'Edit Customer',
+            href: `/dashboard/customers/${id}/edit`,
+            active: true,
           },
         ]}
       />
       <Form
         customer={customer}
-        existingAvatars={existingAvatars}
-        libraryItems={items}
-        libraryTotalPages={totalPages}
-        folders={folders}
-        isAdmin={isAdmin}
         returnTo={returnTo}
+        libraryItems={media.items}
+        libraryNextCursor={media.nextCursor}
+        libraryHasMore={media.hasMore}
+        isAdmin={isAdmin}
       />
     </main>
   );
 }
+
+// import Form from '@/app/ui/customers/edit-form';
+// import Breadcrumbs from '@/app/ui/invoices/breadcrumbs';
+// import {fetchCustomerById }from '@/app/lib/data';
+// import {getExistingAvatars }from '@/app/lib/avatars';
+// import {notFound }from 'next/navigation';
+// import {Metadata }from 'next';
+// import {listMediaAssets,listMediaFolders }from '@/app/lib/media';
+
+// export const metadata: Metadata = {
+//   title:'Edit Customer',
+// };
+
+// export default async function Page(props: {
+//     params: Promise<{id: string }>;
+//     searchParams?: Promise<{returnTo?: string }>;
+// }) {
+//     const {id }= await props.params;
+//     const searchParams = await props.searchParams;
+//     const returnTo = searchParams?.returnTo || '/dashboard/customers';
+
+//     const [{items,totalPages },folders]= await Promise.all([
+//         listMediaAssets({ page:1, folder:'customers' }),
+//         listMediaFolders(),
+//       ]);
+
+//       const isAdmin = false;// replace with real role check
+
+//   const [customer,existingAvatars]= await Promise.all([
+//     fetchCustomerById(id),
+//     getExistingAvatars(),
+//   ]);
+
+//   if (!customer) {
+//     notFound();
+//   }
+
+//   return (
+//     <main>
+//       <Breadcrumbs
+//         breadcrumbs={[
+//           { label:'Customers', href:'/dashboard/customers' },
+//           {
+//             label:'Edit Customer',
+//             href:`/dashboard/customers/${id}/edit`,
+//             active:true,
+//           },
+//         ]}
+//       />
+//       <Form
+//         customer={customer}
+//         existingAvatars={existingAvatars}
+//         libraryItems={items}
+//         libraryTotalPages={totalPages}
+//         folders={folders}
+//         isAdmin={isAdmin}
+//         returnTo={returnTo}
+//       />
+//     </main>
+//   );
+// }
