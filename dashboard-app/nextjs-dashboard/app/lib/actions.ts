@@ -117,12 +117,13 @@ export async function updateInvoice(
   redirect('/dashboard/invoices');
 }
 
-export async function deleteInvoice(id: string) {
+/** Form action: must return void (no { message } object) */
+export async function deleteInvoice(id: string): Promise<void> {
   try {
     await sql`DELETE FROM invoices WHERE id = ${id}`;
   } catch (error) {
     console.error(error);
-    return { message: 'Database Error: Failed to Delete Invoice.' };
+    throw new Error('Database Error: Failed to Delete Invoice.');
   }
 
   revalidatePath('/dashboard', 'layout');
@@ -130,7 +131,7 @@ export async function deleteInvoice(id: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Auth (Supabase — no next-auth)
+// Auth (Supabase)
 // ---------------------------------------------------------------------------
 
 const CredentialsSchema = z.object({
@@ -257,7 +258,6 @@ async function resolveCustomerImage(
 
   if (hasFile) {
     try {
-      // uploadCustomerAvatar(file) → returns string URL (Blob only)
       const image_url = await uploadCustomerAvatar(file as File);
       return { ok: true, image_url };
     } catch (err) {
@@ -288,7 +288,6 @@ async function resolveCustomerImage(
     return { ok: true, image_url: existing };
   }
 
-  // Edit: keep previous avatar if user did not change image
   if (options?.fallbackImageUrl) {
     return { ok: true, image_url: options.fallbackImageUrl };
   }
@@ -389,7 +388,6 @@ export async function updateCustomer(
     };
   }
 
-  // Current avatar as fallback when user doesn't change image
   const currentRows = await sql`
     SELECT image_url FROM customers WHERE id = ${id}
   `;
@@ -450,6 +448,7 @@ export async function updateCustomer(
   redirect(returnTo);
 }
 
+/** Called from client onClick (not form action) — may return { success, message } */
 export async function deleteCustomer(id: string) {
   const pending = await sql`
     SELECT COUNT(*)::int AS count
