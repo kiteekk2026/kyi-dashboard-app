@@ -13,9 +13,8 @@ import { createClient } from '@/app/lib/supabase/server';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { getExistingAvatars } from '@/app/lib/avatars';
+import {getPresetAvatars,isAllowedAvatarUrl }from '@/app/lib/avatars';
 import {uploadCustomerAvatar }from '@/app/lib/blob';
-
 import {
   CustomerErrorCode
 } from '@/app/lib/customer-errors';
@@ -343,43 +342,91 @@ export async function createCustomer(
     };
   }
 
-  let image_url: string | null = null;
+  // let image_url: string | null = null;
 
+  // const existing = formData.get('image_url');
+  // const file = formData.get('avatar');
+
+  // const hasFile =
+  //   file &&
+  //   typeof file === 'object' &&
+  //   'size' in file &&
+  //   (file as File).size > 0;
+
+  // if (hasFile) {
+  //   try {
+  //     image_url = await uploadCustomerAvatar(file as File);
+  //   } catch (err) {
+  //     console.error('Upload error:', err);
+  //     return {
+  //       message:
+  //         err instanceof Error ? err.message : 'Failed to upload image.',
+  //       values: {
+  //         name: String(raw.name ?? ''),
+  //         email: String(raw.email ?? ''),
+  //       },
+  //       errors: { image_url: ['Failed to upload image.'] },
+  //     };
+  //   }
+  // } else if (typeof existing === 'string' && existing.length > 0) {
+  //   const allowed = await isAllowedAvatarUrl(existing);
+
+  //   if (!allowed) {
+  //     return {
+  //       errors: { image_url: ['Selected avatar is not allowed.'] },
+  //       message: 'Invalid avatar.',
+  //       values: {
+  //         name: String(raw.name ?? ''),
+  //         email: String(raw.email ?? ''),
+  //       },
+  //     };
+  //   }
+
+  //   image_url = existing;
+  // } else {
+  //   return {
+  //     errors: { image_url: ['Please select or upload an avatar.'] },
+  //     message: 'Missing or invalid fields. Failed to create customer.',
+  //     values: {
+  //       name: String(raw.name ?? ''),
+  //       email: String(raw.email ?? ''),
+  //     },
+  //   };
+  // }
+
+  let image_url: string | null = null;
 const existing = formData.get('image_url');
 const file = formData.get('avatar');
-
 const hasFile =
-  file &&
-  typeof file === 'object' &&
-  'size' in file &&
-  (file as File).size > 0;
+  file && typeof file === 'object' && 'size' in file && (file as File).size > 0;
 
 if (hasFile) {
   try {
-    image_url = await uploadCustomerAvatar(file as File);
+    const uploaded = await uploadCustomerAvatar(file as File, {
+      folder:'customers',
+    });
+    image_url = uploaded.url;
   }catch (err) {
-    console.error('Upload error:',err);
     return {
-      message:
-        err instanceof Error ? err.message : 'Failed to upload image.',
-      values: {
-        name: String(raw.name ?? ''),
-        email: String(raw.email ?? ''),
-      },
+      message:err instanceof Error ? err.message : 'Failed to upload image.',
       errors: { image_url: ['Failed to upload image.'] },
+      values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
     };
   }
 }else if (typeof existing === 'string' && existing.length> 0) {
-  // Existing static assets still OK: /customers/amy-burns.png
+  if (!isAllowedAvatarUrl(existing)) {
+    return {
+      errors: { image_url: ['Selected avatar is not allowed.'] },
+      message:'Invalid avatar.',
+      values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
+    };
+  }
   image_url = existing;
 }else {
   return {
     errors: { image_url: ['Please select or upload an avatar.'] },
     message:'Missing or invalid fields. Failed to create customer.',
-    values: {
-      name: String(raw.name ?? ''),
-      email: String(raw.email ?? ''),
-    },
+    values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
   };
 }
 
@@ -547,29 +594,92 @@ export async function updateCustomer(
 
 
   // 2. Resolve image (same logic as createCustomer)
+  // let image_url: string | null = null;
+
+  // const existing = formData.get('image_url');
+  // const file = formData.get('avatar');
+
+  // const hasFile =
+  //   file &&
+  //   typeof file === 'object' &&
+  //   'size' in file &&
+  //   (file as File).size > 0;
+
+  // if (hasFile) {
+  //   try {
+  //     image_url = await uploadCustomerAvatar(file as File);
+  //   } catch (err) {
+  //     console.error('Upload error:', err);
+  //     return {
+  //       message:
+  //         err instanceof Error ? err.message : 'Failed to upload image.',
+  //       values: {
+  //         name: String(raw.name ?? ''),
+  //         email: String(raw.email ?? ''),
+  //       },
+  //       errors: { image_url: ['Failed to upload image.'] },
+  //     };
+  //   }
+  // } else if (typeof existing === 'string' && existing.length > 0) {
+  //   const allowed = await isAllowedAvatarUrl(existing);
+
+  //   if (!allowed) {
+  //     return {
+  //       errors: { image_url: ['Selected avatar is not allowed.'] },
+  //       message: 'Invalid avatar.',
+  //       values: {
+  //         name: String(raw.name ?? ''),
+  //         email: String(raw.email ?? ''),
+  //       },
+  //     };
+  //   }
+
+  //   image_url = existing;
+  // } else {
+  //   return {
+  //     errors: { image_url: ['Please select or upload an avatar.'] },
+  //     message: 'Missing or invalid fields. Failed to create customer.',
+  //     values: {
+  //       name: String(raw.name ?? ''),
+  //       email: String(raw.email ?? ''),
+  //     },
+  //   };
+  // }
   let image_url: string | null = null;
+const existing = formData.get('image_url');
+const file = formData.get('avatar');
+const hasFile =
+  file && typeof file === 'object' && 'size' in file && (file as File).size > 0;
 
-  const existing = formData.get('image_url') as string | null;
-  const file = formData.get('avatar') as File | null;
-
-  if (file && file.size > 0) {
-    // upload logic (identical to create)
-    // … size/type checks, writeFile, set image_url …
-  } else if (existing) {
-    const allowed = await getExistingAvatars();
-    if (allowed.includes(existing)) {
-      image_url = existing;
-    } else {
-      return {
-        errors: { image_url: ['Selected avatar is not allowed.'] },
-        message: 'Invalid avatar.',
-      };
-    }
-  } else {
-    // Keep the current avatar if the user didn’t change it
-    // (you can also fetch the current value if you prefer)
-    image_url = existing;// will be null only if nothing was sent
+if (hasFile) {
+  try {
+    const uploaded = await uploadCustomerAvatar(file as File, {
+      folder:'customers',
+    });
+    image_url = uploaded.url;
+  }catch (err) {
+    return {
+      message:err instanceof Error ? err.message : 'Failed to upload image.',
+      errors: { image_url: ['Failed to upload image.'] },
+      values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
+    };
   }
+}else if (typeof existing === 'string' && existing.length> 0) {
+  if (!isAllowedAvatarUrl(existing)) {
+    return {
+      errors: { image_url: ['Selected avatar is not allowed.'] },
+      message:'Invalid avatar.',
+      values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
+    };
+  }
+  image_url = existing;
+}else {
+  return {
+    errors: { image_url: ['Please select or upload an avatar.'] },
+    message:'Missing or invalid fields. Failed to create customer.',
+    values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
+  };
+}
 
   // If still no image_url, you may want to keep the old one.
   // Simplest safe approach: require an image or fall back to the previous value.

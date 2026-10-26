@@ -4,6 +4,7 @@ import {fetchCustomerById }from '@/app/lib/data';
 import {getExistingAvatars }from '@/app/lib/avatars';
 import {notFound }from 'next/navigation';
 import {Metadata }from 'next';
+import {listMediaAssets,listMediaFolders }from '@/app/lib/media';
 
 export const metadata: Metadata = {
   title:'Edit Customer',
@@ -16,6 +17,13 @@ export default async function Page(props: {
     const {id }= await props.params;
     const searchParams = await props.searchParams;
     const returnTo = searchParams?.returnTo || '/dashboard/customers';
+
+    const [{items,totalPages },folders]= await Promise.all([
+        listMediaAssets({ page:1, folder:'customers' }),
+        listMediaFolders(),
+      ]);
+
+      const isAdmin = false;// replace with real role check
 
   const [customer,existingAvatars]= await Promise.all([
     fetchCustomerById(id),
@@ -41,6 +49,10 @@ export default async function Page(props: {
       <Form
         customer={customer}
         existingAvatars={existingAvatars}
+        libraryItems={items}
+        libraryTotalPages={totalPages}
+        folders={folders}
+        isAdmin={isAdmin}
         returnTo={returnTo}
       />
     </main>

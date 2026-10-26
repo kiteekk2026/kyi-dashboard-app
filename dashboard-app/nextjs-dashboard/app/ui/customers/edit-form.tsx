@@ -18,6 +18,11 @@ import {
     customerErrorMessages,
 } from '@/app/lib/customer-errors';
 
+import { PRESET_AVATARS } from '@/app/lib/avatars';
+import AvatarLibraryModal from '@/app/ui/customers/avatar-library-modal';
+import { loadMediaPageAction } from '@/app/lib/media-actions';
+import type { MediaAsset } from '@/app/lib/media';
+
 function getErrorText(
     codeOrMessage: string | undefined,
     values?: { email?: string; name?: string },
@@ -34,6 +39,10 @@ function getErrorText(
 }
 
 export default function EditCustomerForm({
+    libraryItems,
+    libraryTotalPages,
+    folders,
+    isAdmin = false,
     customer,
     existingAvatars,
     returnTo,
@@ -41,14 +50,22 @@ export default function EditCustomerForm({
     customer: FormattedCustomersTable;
     existingAvatars: string[];
     returnTo: string;
+    libraryItems: MediaAsset[];
+    libraryTotalPages: number;
+    folders: string[];
+    isAdmin?: boolean;
 }) {
     const initialState: CustomerState = { message: null, errors: {} };
     const updateCustomerWithId = updateCustomer.bind(null, customer.id);
     const [state, formAction, isPending] = useActionState(updateCustomerWithId, initialState);
 
-    const [mode, setMode] = useState<'existing' | 'upload'>('existing');
+
     const [preview, setPreview] = useState<string | null>(null);
     const [errorModalOpen, setErrorModalOpen] = useState(false);
+
+    const [mode, setMode] = useState<'preset' | 'upload' | 'library'>('preset');
+    const [libraryOpen, setLibraryOpen] = useState(false);
+    const [libraryUrl, setLibraryUrl] = useState<string | null>(null);
 
     // Local errors for on-blur validation
     const [clientErrors, setClientErrors] = useState<{
@@ -111,7 +128,7 @@ export default function EditCustomerForm({
     return (
         <>
             <form action={formAction}>
-            <input type="hidden" name="returnTo" value={returnTo} />
+                <input type="hidden" name="returnTo" value={returnTo} />
                 <div className="rounded-md bg-gray-50 p-4 md:p-6">
                     {/* Name */}
                     <div className="mb-4">
@@ -171,93 +188,55 @@ export default function EditCustomerForm({
                     <fieldset className="mb-4">
                         <legend className="mb-2 block text-sm font-medium">Avatar</legend>
 
-                        <div className="mb-4 flex gap-4">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setMode('existing');
-                                    setPreview(null);
-                                }}
-                                className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === 'existing'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                    }`}
-                            >
-                                Choose existing
+                        <div className="mb-4 flex flex-wrap gap-2">
+                            <button type="button" onClick={() => { setMode('preset'); setLibraryUrl(null); }} className={mode === 'preset' ? 'bg-blue-600 text-white' : 'bg-gray-200'}>
+                                Presets
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => setMode('upload')}
-                                className={`rounded-md px-3 py-1.5 text-sm font-medium ${mode === 'upload'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                    }`}
-                            >
+                            <button type="button" onClick={() => { setMode('upload'); setLibraryUrl(null); }} className={mode === 'upload' ? 'bg-blue-600 text-white' : 'bg-gray-200'}>
                                 Upload new
+                            </button>
+                            <button type="button" onClick={() => setLibraryOpen(true)} className={mode === 'library' ? 'bg-blue-600 text-white' : 'bg-gray-200'}>
+                                From library
                             </button>
                         </div>
 
-                        {mode === 'existing' && (
+                        {mode === 'preset' && (
                             <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
-                                {existingAvatars.map((src) => (
-                                    <label
-                                        key={src}
-                                        className="flex cursor-pointer flex-col items-center gap-2 rounded-md border border-gray-200 p-2 hover:bg-gray-100 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50"
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="image_url"
-                                            value={src}
-                                            className="sr-only"
-                                            defaultChecked={src === customer.image_url}
-                                        />
-                                        <Image
-                                            src={src}
-                                            alt="Customer avatar"
-                                            width={48}
-                                            height={48}
-                                            className="rounded-full"
-                                        />
+                                {PRESET_AVATARS.map((src: string) => (
+                                    <label key={src} className="flex cursor-pointer flex-col items-center gap-2 rounded-md border p-2 has-[:checked]:border-blue-500">
+                                        <input type="radio" name="image_url" value={src} className="sr-only" defaultChecked={src === PRESET_AVATARS[0]} />
+                                        <Image src={src} alt="" width={48} height={48} className="rounded-full" />
                                     </label>
                                 ))}
                             </div>
                         )}
 
                         {mode === 'upload' && (
-                            <div className="flex flex-col items-start gap-3">
-                                <label
-                                    htmlFor="avatar"
-                                    className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-600 hover:bg-gray-100"
-                                >
-                                    <PhotoIcon className="h-5 w-5" />
-                                    <span>Select image (PNG / JPG)</span>
-                                </label>
-                                <input
-                                    id="avatar"
-                                    name="avatar"
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/webp"
-                                    className="hidden"
-                                    onChange={handleFileChange}
-                                />
-                                {preview && (
-                                    <img
-                                        src={preview}
-                                        alt="Preview"
-                                        className="mt-2 h-16 w-16 rounded-full object-cover"
-                                    />
-                                )}
-                            </div>
+                            <input name="avatar" type="file" accept="image/png,image/jpeg,image/webp" />
                         )}
 
-                        <div id="image_url-error" aria-live="polite" aria-atomic="true">
-                            {state.errors?.image_url?.map((error) => (
-                                <p className="mt-2 text-sm text-red-500" key={error}>
-                                    {error}
-                                </p>
-                            ))}
-                        </div>
+                        {mode === 'library' && libraryUrl && (
+                            <>
+                                <input type="hidden" name="image_url" value={libraryUrl} />
+                                <img src={libraryUrl} alt="" className="h-16 w-16 rounded-full object-cover" />
+                            </>
+                        )}
                     </fieldset>
+
+                    <AvatarLibraryModal
+                        open={libraryOpen}
+                        onClose={() => setLibraryOpen(false)}
+                        initialItems={libraryItems}
+                        initialTotalPages={libraryTotalPages}
+                        folders={folders}
+                        isAdmin={isAdmin}
+                        onLoadPage={loadMediaPageAction}
+                        onSelect={(url) => {
+                            setLibraryUrl(url);
+                            setMode('library');
+                            setLibraryOpen(false);
+                        }}
+                    />
 
                     {state.message && (
                         <p className="mt-2 text-sm text-red-500">{state.message}</p>
