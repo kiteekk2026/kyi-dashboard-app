@@ -3,32 +3,25 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-// import postgres from 'postgres';
-import sql from '@/app/lib/db'
-//comment because of supabase auth
-// import { signIn } from '@/auth';
-// import { AuthError } from 'next-auth';
+import sql from '@/app/lib/db';
 import { headers } from 'next/headers';
 import { createClient } from '@/app/lib/supabase/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
-import { randomUUID } from 'crypto';
-import {getPresetAvatars,isAllowedAvatarUrl }from '@/app/lib/avatars';
-import {uploadCustomerAvatar }from '@/app/lib/blob';
-import {
-  CustomerErrorCode
-} from '@/app/lib/customer-errors';
+import { isAllowedAvatarUrl } from '@/app/lib/avatars';
+import { uploadCustomerAvatar } from '@/app/lib/blob';
+import { CustomerErrorCode } from '@/app/lib/customer-errors';
 
-// const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
-
-
+// ---------------------------------------------------------------------------
+// Invoices
+// ---------------------------------------------------------------------------
 
 const FormSchema = z.object({
   id: z.string(),
   customerId: z.string({
     invalid_type_error: 'Please select a customer.',
   }),
-  amount: z.coerce.number().gt(0, { message: 'Please enter an amount greater than $0.' }),
+  amount: z.coerce
+    .number()
+    .gt(0, { message: 'Please enter an amount greater than $0.' }),
   status: z.enum(['pending', 'paid'], {
     invalid_type_error: 'Please select an invoice status.',
   }),
@@ -44,44 +37,38 @@ export type State = {
     customerId?: string[];
     amount?: string[];
     status?: string[];
+    description?: string[];
   };
   message?: string | null;
 };
 
 export async function createInvoice(prevState: State, formData: FormData) {
-  // Validate form fields using Zod
   const validatedFields = CreateInvoice.safeParse({
     customerId: formData.get('customerId'),
     amount: formData.get('amount'),
     status: formData.get('status'),
     description: formData.get('description'),
   });
-  // If form validation fails, return errors early. Otherwise, continue.
+
   if (!validatedFields.success) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
       message: 'Missing Fields. Failed to Create Invoice.',
     };
   }
-  const { customerId, amount, status, description } = CreateInvoice.parse({
-    customerId: formData.get('customerId'),
-    amount: formData.get('amount'),
-    status: formData.get('status'),
-    description: formData.get('description'),
-  });
+
+  const { customerId, amount, status, description } = validatedFields.data;
   const amountInCents = amount * 100;
   const date = new Date().toISOString().split('T')[0];
-  // Test it out:
+
   try {
     await sql`
-    INSERT INTO invoices (customer_id, amount, status, date, description)
-    VALUES (${customerId}, ${amountInCents}, ${status}, ${date}, ${description})
-  `;
+      INSERT INTO invoices (customer_id, amount, status, date, description)
+      VALUES (${customerId}, ${amountInCents}, ${status}, ${date}, ${description})
+    `;
   } catch (error) {
     console.error(error);
-    return {
-      message: 'Database Error: Failed to Create Invoice.'
-    }
+    return { message: 'Database Error: Failed to Create Invoice.' };
   }
 
   revalidatePath('/dashboard', 'layout');
@@ -89,18 +76,17 @@ export async function createInvoice(prevState: State, formData: FormData) {
   redirect('/dashboard/invoices');
 }
 
-export async function updateInvoice(id: string, prevState: State, formData: FormData) {
+export async function updateInvoice(
+  id: string,
+  prevState: State,
+  formData: FormData,
+) {
   const validatedFields = UpdateInvoice.safeParse({
     customerId: formData.get('customerId'),
     amount: formData.get('amount'),
     status: formData.get('status'),
     description: formData.get('description'),
   });
-  // const validatedFields = UpdateInvoice.safeParse({
-  //   customerId: formData.get('customerId'),
-  //   amount: formData.get('amount'),
-  //   status: formData.get('status'),
-  // });
 
   if (!validatedFields.success) {
     return {
@@ -111,11 +97,14 @@ export async function updateInvoice(id: string, prevState: State, formData: Form
 
   const { customerId, amount, status, description } = validatedFields.data;
   const amountInCents = amount * 100;
+
   try {
     await sql`
       UPDATE invoices
-      SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status},
-      description = ${description}
+      SET customer_id = ${customerId},
+          amount = ${amountInCents},
+          status = ${status},
+          description = ${description}
       WHERE id = ${id}
     `;
   } catch (error) {
@@ -129,32 +118,20 @@ export async function updateInvoice(id: string, prevState: State, formData: Form
 }
 
 export async function deleteInvoice(id: string) {
-  // throw new Error('Failed to Delete Invoice');
-
-  await sql`DELETE FROM invoices WHERE id = ${id}`;
+  try {
+    await sql`DELETE FROM invoices WHERE id = ${id}`;
+  } catch (error) {
+    console.error(error);
+    return { message: 'Database Error: Failed to Delete Invoice.' };
+  }
 
   revalidatePath('/dashboard', 'layout');
   revalidatePath('/dashboard/invoices');
 }
 
-// export async function authenticate(
-//   prevState: string | undefined,
-//   formData: FormData,
-// ) {
-//   try {
-//     await signIn('credentials', formData);
-//   } catch (error) {
-//     if (error instanceof AuthError) {
-//       switch (error.type) {
-//         case 'CredentialsSignin':
-//           return 'Invalid credentials.';
-//         default:
-//           return 'Something went wrong.';
-//       }
-//     }
-//     throw error;
-//   }
-// }
+// ---------------------------------------------------------------------------
+// Auth (Supabase — no next-auth)
+// ---------------------------------------------------------------------------
 
 const CredentialsSchema = z.object({
   email: z.string().email(),
@@ -203,7 +180,6 @@ export async function signInWithGithub(formData: FormData) {
   redirect(data.url);
 }
 
-//########## Google ###################
 export async function signInWithGoogle(formData: FormData) {
   const origin = (await headers()).get('origin');
   const next = safeRedirectPath(formData.get('redirectTo'));
@@ -231,31 +207,9 @@ export async function signOut() {
   redirect('/');
 }
 
-const ALLOWED_EXISTING = [
-  '/customers/amy-burns.png',
-  '/customers/balazs-orban.png',
-  '/customers/delba-de-oliveira.png',
-  '/customers/evil-rabbit.png',
-  '/customers/lee-robinson.png',
-  '/customers/michael-novotny.png',
-] as const;
-
-// const CustomerFormSchema = z.object({
-//   name:z.string().min(1, { message:'Please enter a name.' }),
-//   email:z.string().email({ message:'Please enter a valid email.' }),
-//   image_url:z.string().optional(),// will be filled by us
-// });
-
-// export type CustomerState = {
-//   errors?: {
-//     name?: string[];
-//     email?: string[];
-//     image_url?: string[];
-//   };
-//   message?: string | null;
-// };
-
-//Shared validation State + Zod schema
+// ---------------------------------------------------------------------------
+// Customers
+// ---------------------------------------------------------------------------
 
 const CustomerFormSchema = z.object({
   name: z
@@ -266,31 +220,14 @@ const CustomerFormSchema = z.object({
     .string()
     .email({ message: 'Please enter a valid email.' })
     .max(100, { message: 'Email is too long.' }),
-  // image_url: z.string().optional(),
 });
-
-// export type CustomerState = {
-//   errors?: {
-//     name?: string[];
-//     email?: string[];
-//     image_url?: string[];
-//   };
-//   message?: string | null;
-//   // Preserve user input on failure
-//   values?: {
-//     name?: string;
-//     email?: string;
-//     image_url?: string;
-//   };
-// };
 
 export type CustomerState = {
   errors?: {
-    name?: string[];       // still useful for field-level codes
+    name?: string[];
     email?: string[];
     image_url?: string[];
   };
-  /** Stable machine-readable codes */
   errorCodes?: CustomerErrorCode[];
   message?: string | null;
   values?: {
@@ -300,24 +237,72 @@ export type CustomerState = {
   };
 };
 
-// export async function createCustomer(
-//   prevState: CustomerState,
-//   formData: FormData,
-// ) {
-//   // 1. Basic field validation
-//   const validatedFields = CustomerFormSchema.safeParse({
-//     name:formData.get('name'),
-//     email:formData.get('email'),
-//   });
+async function resolveCustomerImage(
+  formData: FormData,
+  options?: { fallbackImageUrl?: string | null },
+): Promise<
+  | { ok: true; image_url: string }
+  | { ok: false; state: CustomerState }
+> {
+  const existing = formData.get('image_url');
+  const file = formData.get('avatar');
+  const name = String(formData.get('name') ?? '');
+  const email = String(formData.get('email') ?? '');
 
-//   if (!validatedFields.success) {
-//     return {
-//       errors:validatedFields.error.flatten().fieldErrors,
-//       message:'Missing Fields. Failed to Create Customer.',
-//     };
-//   }
+  const hasFile =
+    file &&
+    typeof file === 'object' &&
+    'size' in file &&
+    (file as File).size > 0;
 
-//   const {name,email }= validatedFields.data;
+  if (hasFile) {
+    try {
+      // uploadCustomerAvatar(file) → returns string URL (Blob only)
+      const image_url = await uploadCustomerAvatar(file as File);
+      return { ok: true, image_url };
+    } catch (err) {
+      console.error('Upload error:', err);
+      return {
+        ok: false,
+        state: {
+          message:
+            err instanceof Error ? err.message : 'Failed to upload image.',
+          errors: { image_url: ['Failed to upload image.'] },
+          values: { name, email },
+        },
+      };
+    }
+  }
+
+  if (typeof existing === 'string' && existing.length > 0) {
+    if (!isAllowedAvatarUrl(existing)) {
+      return {
+        ok: false,
+        state: {
+          errors: { image_url: ['Selected avatar is not allowed.'] },
+          message: 'Invalid avatar.',
+          values: { name, email },
+        },
+      };
+    }
+    return { ok: true, image_url: existing };
+  }
+
+  // Edit: keep previous avatar if user did not change image
+  if (options?.fallbackImageUrl) {
+    return { ok: true, image_url: options.fallbackImageUrl };
+  }
+
+  return {
+    ok: false,
+    state: {
+      errors: { image_url: ['Please select or upload an avatar.'] },
+      message: 'Missing or invalid fields. Failed to save customer.',
+      values: { name, email },
+    },
+  };
+}
+
 export async function createCustomer(
   prevState: CustomerState,
   formData: FormData,
@@ -325,7 +310,6 @@ export async function createCustomer(
   const raw = {
     name: formData.get('name'),
     email: formData.get('email'),
-    // image_url: formData.get('image_url'),
   };
 
   const validated = CustomerFormSchema.safeParse(raw);
@@ -337,198 +321,34 @@ export async function createCustomer(
       values: {
         name: String(raw.name ?? ''),
         email: String(raw.email ?? ''),
-        // image_url: String(raw.image_url ?? ''),
       },
     };
   }
 
-  // let image_url: string | null = null;
+  const imageResult = await resolveCustomerImage(formData);
+  if (!imageResult.ok) return imageResult.state;
+  const { image_url } = imageResult;
 
-  // const existing = formData.get('image_url');
-  // const file = formData.get('avatar');
-
-  // const hasFile =
-  //   file &&
-  //   typeof file === 'object' &&
-  //   'size' in file &&
-  //   (file as File).size > 0;
-
-  // if (hasFile) {
-  //   try {
-  //     image_url = await uploadCustomerAvatar(file as File);
-  //   } catch (err) {
-  //     console.error('Upload error:', err);
-  //     return {
-  //       message:
-  //         err instanceof Error ? err.message : 'Failed to upload image.',
-  //       values: {
-  //         name: String(raw.name ?? ''),
-  //         email: String(raw.email ?? ''),
-  //       },
-  //       errors: { image_url: ['Failed to upload image.'] },
-  //     };
-  //   }
-  // } else if (typeof existing === 'string' && existing.length > 0) {
-  //   const allowed = await isAllowedAvatarUrl(existing);
-
-  //   if (!allowed) {
-  //     return {
-  //       errors: { image_url: ['Selected avatar is not allowed.'] },
-  //       message: 'Invalid avatar.',
-  //       values: {
-  //         name: String(raw.name ?? ''),
-  //         email: String(raw.email ?? ''),
-  //       },
-  //     };
-  //   }
-
-  //   image_url = existing;
-  // } else {
-  //   return {
-  //     errors: { image_url: ['Please select or upload an avatar.'] },
-  //     message: 'Missing or invalid fields. Failed to create customer.',
-  //     values: {
-  //       name: String(raw.name ?? ''),
-  //       email: String(raw.email ?? ''),
-  //     },
-  //   };
-  // }
-
-  let image_url: string | null = null;
-const existing = formData.get('image_url');
-const file = formData.get('avatar');
-const hasFile =
-  file && typeof file === 'object' && 'size' in file && (file as File).size > 0;
-
-if (hasFile) {
-  try {
-    const uploaded = await uploadCustomerAvatar(file as File, {
-      folder:'customers',
-    });
-    image_url = uploaded.url;
-  }catch (err) {
-    return {
-      message:err instanceof Error ? err.message : 'Failed to upload image.',
-      errors: { image_url: ['Failed to upload image.'] },
-      values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
-    };
-  }
-}else if (typeof existing === 'string' && existing.length> 0) {
-  if (!isAllowedAvatarUrl(existing)) {
-    return {
-      errors: { image_url: ['Selected avatar is not allowed.'] },
-      message:'Invalid avatar.',
-      values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
-    };
-  }
-  image_url = existing;
-}else {
-  return {
-    errors: { image_url: ['Please select or upload an avatar.'] },
-    message:'Missing or invalid fields. Failed to create customer.',
-    values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
-  };
-}
-
-  // 2. Resolve the image
-  // let image_url: string | null = null;
-
-  // const existing = formData.get('image_url') as string | null;
-  // const file = formData.get('avatar') as File | null;
-
-  // if (file && file.size > 0) {
-  //   // ----- Upload path -----
-  //   // Basic safety checks
-  //   if (!file.type.startsWith('image/')) {
-  //     return {
-  //       errors: { image_url: ['Only image files are allowed.'] },
-  //       message: 'Invalid file type.',
-  //     };
-  //   }
-  //   if (file.size > 2 * 1024 * 1024) {
-  //     // 2 MB limit
-  //     return {
-  //       errors: { image_url: ['Image must be smaller than 2 MB.'] },
-  //       message: 'File too large.',
-  //     };
-  //   }
-
-  //   try {
-  //     const bytes = await file.arrayBuffer();
-  //     const buffer = Buffer.from(bytes);
-
-  //     // Ensure directory exists
-  //     const uploadDir = path.join(process.cwd(), 'public', 'customers');
-  //     await mkdir(uploadDir, { recursive: true });
-
-  //     // Unique filename
-  //     const ext = path.extname(file.name) || '.png';
-  //     const shortId = randomUUID().replace(/-/g, "").slice(0, 10);
-  //     const filename = `${shortId}${ext}`;
-  //     const filepath = path.join(uploadDir, filename);
-
-  //     await writeFile(filepath, buffer);
-  //     image_url = `/customers/${filename}`;
-  //   } catch (err) {
-  //     console.error('Upload error:', err);
-  //     return {
-  //       message: 'Failed to upload image.',
-  //     };
-  //   }
-  // } else if (existing) {
-  //   // ----- Dynamic existing avatar check -----
-  //   const allowed = await getExistingAvatars();
-
-  //   if (allowed.includes(existing)) {
-  //     image_url = existing;
-  //   } else {
-  //     return {
-  //       errors: { image_url: ['Selected avatar is not allowed.'] },
-  //       message: 'Invalid avatar.',
-  //     };
-  //   }
-  // } else {
-  //   return {
-  //     errors: { image_url: ['Please select or upload an avatar.'] },
-  //     message: 'Missing avatar.',
-  //   };
-  // }
-
-  // 3. Insert into database
-  //   try {
-  //     await sql`
-  //       INSERT INTO customers (name, email, image_url)
-  //       VALUES (${name}, ${email}, ${image_url})
-  //     `;
-  //   }catch (error) {
-  //     return {
-  //       message:'Database Error: Failed to Create Customer.',
-  //     };
-  //   }
-
-  //   revalidatePath('/dashboard/customers');
-  //   redirect('/dashboard/customers');
-  // }
   try {
     await sql`
-    INSERT INTO customers (name, email, image_url)
-    VALUES (${validated.data.name}, ${validated.data.email}, ${image_url})
-  `;
+      INSERT INTO customers (name, email, image_url)
+      VALUES (${validated.data.name}, ${validated.data.email}, ${image_url})
+    `;
   } catch (error: any) {
-    // Postgres unique_violation
     if (error?.code === '23505') {
       return {
         errors: { email: [CustomerErrorCode.EMAIL_TAKEN] },
         errorCodes: [CustomerErrorCode.EMAIL_TAKEN],
-        message: CustomerErrorCode.EMAIL_TAKEN, // or keep a short fallback
+        message: CustomerErrorCode.EMAIL_TAKEN,
         values: {
           name: validated.data.name,
           email: validated.data.email,
-          image_url: image_url ?? undefined,
+          image_url,
         },
       };
     }
 
+    console.error(error);
     return {
       errors: {},
       errorCodes: [CustomerErrorCode.DATABASE_ERROR],
@@ -536,36 +356,16 @@ if (hasFile) {
       values: {
         name: validated.data.name,
         email: validated.data.email,
-        image_url: image_url ?? undefined,
+        image_url,
       },
     };
   }
 
   revalidatePath('/dashboard', 'layout');
-  revalidatePath('/dashboard/customers', 'layout');
   revalidatePath('/dashboard/customers');
   redirect('/dashboard/customers');
 }
 
-// export async function updateCustomer(
-//   id: string,
-//   prevState: CustomerState,
-//   formData: FormData,
-// ) {
-//   // 1. Validate name + email (same rules as create)
-//   const validatedFields = CustomerFormSchema.safeParse({
-//     name:formData.get('name'),
-//     email:formData.get('email'),
-//   });
-
-//   if (!validatedFields.success) {
-//     return {
-//       errors:validatedFields.error.flatten().fieldErrors,
-//       message:'Missing Fields. Failed to Update Customer.',
-//     };
-//   }
-
-//   const {name,email }= validatedFields.data;
 export async function updateCustomer(
   id: string,
   prevState: CustomerState,
@@ -574,7 +374,6 @@ export async function updateCustomer(
   const raw = {
     name: formData.get('name'),
     email: formData.get('email'),
-    // image_url: formData.get('image_url'),
   };
 
   const validated = CustomerFormSchema.safeParse(raw);
@@ -582,146 +381,50 @@ export async function updateCustomer(
   if (!validated.success) {
     return {
       errors: validated.error.flatten().fieldErrors,
-      message: 'Missing or invalid fields. Failed to create customer.',
+      message: 'Missing or invalid fields. Failed to update customer.',
       values: {
         name: String(raw.name ?? ''),
         email: String(raw.email ?? ''),
-        // image_url: String(raw.image_url ?? ''),
       },
     };
   }
 
+  // Current avatar as fallback when user doesn't change image
+  const currentRows = await sql`
+    SELECT image_url FROM customers WHERE id = ${id}
+  `;
+  const fallbackImageUrl =
+    (currentRows[0]?.image_url as string | undefined) ?? null;
 
+  const imageResult = await resolveCustomerImage(formData, {
+    fallbackImageUrl,
+  });
+  if (!imageResult.ok) return imageResult.state;
+  const { image_url } = imageResult;
 
-  // 2. Resolve image (same logic as createCustomer)
-  // let image_url: string | null = null;
-
-  // const existing = formData.get('image_url');
-  // const file = formData.get('avatar');
-
-  // const hasFile =
-  //   file &&
-  //   typeof file === 'object' &&
-  //   'size' in file &&
-  //   (file as File).size > 0;
-
-  // if (hasFile) {
-  //   try {
-  //     image_url = await uploadCustomerAvatar(file as File);
-  //   } catch (err) {
-  //     console.error('Upload error:', err);
-  //     return {
-  //       message:
-  //         err instanceof Error ? err.message : 'Failed to upload image.',
-  //       values: {
-  //         name: String(raw.name ?? ''),
-  //         email: String(raw.email ?? ''),
-  //       },
-  //       errors: { image_url: ['Failed to upload image.'] },
-  //     };
-  //   }
-  // } else if (typeof existing === 'string' && existing.length > 0) {
-  //   const allowed = await isAllowedAvatarUrl(existing);
-
-  //   if (!allowed) {
-  //     return {
-  //       errors: { image_url: ['Selected avatar is not allowed.'] },
-  //       message: 'Invalid avatar.',
-  //       values: {
-  //         name: String(raw.name ?? ''),
-  //         email: String(raw.email ?? ''),
-  //       },
-  //     };
-  //   }
-
-  //   image_url = existing;
-  // } else {
-  //   return {
-  //     errors: { image_url: ['Please select or upload an avatar.'] },
-  //     message: 'Missing or invalid fields. Failed to create customer.',
-  //     values: {
-  //       name: String(raw.name ?? ''),
-  //       email: String(raw.email ?? ''),
-  //     },
-  //   };
-  // }
-  let image_url: string | null = null;
-const existing = formData.get('image_url');
-const file = formData.get('avatar');
-const hasFile =
-  file && typeof file === 'object' && 'size' in file && (file as File).size > 0;
-
-if (hasFile) {
-  try {
-    const uploaded = await uploadCustomerAvatar(file as File, {
-      folder:'customers',
-    });
-    image_url = uploaded.url;
-  }catch (err) {
-    return {
-      message:err instanceof Error ? err.message : 'Failed to upload image.',
-      errors: { image_url: ['Failed to upload image.'] },
-      values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
-    };
-  }
-}else if (typeof existing === 'string' && existing.length> 0) {
-  if (!isAllowedAvatarUrl(existing)) {
-    return {
-      errors: { image_url: ['Selected avatar is not allowed.'] },
-      message:'Invalid avatar.',
-      values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
-    };
-  }
-  image_url = existing;
-}else {
-  return {
-    errors: { image_url: ['Please select or upload an avatar.'] },
-    message:'Missing or invalid fields. Failed to create customer.',
-    values: { name:String(raw.name ?? ''), email:String(raw.email ?? '') },
-  };
-}
-
-  // If still no image_url, you may want to keep the old one.
-  // Simplest safe approach: require an image or fall back to the previous value.
-  // For brevity we assume the form always sends one.
-
-  // 3. Update the row
-  //   try {
-  //     await sql`
-  //       UPDATE customers
-  //       SET name = ${name}, email = ${email}, image_url = ${image_url}
-  //       WHERE id = ${id}
-  //     `;
-  //   }catch (error) {
-  //     return { message:'Database Error: Failed to Update Customer.' };
-  //   }
-
-  //   revalidatePath('/dashboard/customers');
-  //   revalidatePath(`/dashboard/customers/${id}`);// detail page too
-  //   redirect('/dashboard/customers');
-  // }
   try {
     await sql`
-        UPDATE customers
-        SET name = ${validated.data.name}, email = ${validated.data.email}, image_url = ${image_url}
-        WHERE id = ${id}
-      `;
-
+      UPDATE customers
+      SET name = ${validated.data.name},
+          email = ${validated.data.email},
+          image_url = ${image_url}
+      WHERE id = ${id}
+    `;
   } catch (error: any) {
-    // Postgres unique_violation
     if (error?.code === '23505') {
       return {
         errors: { email: [CustomerErrorCode.EMAIL_TAKEN] },
         errorCodes: [CustomerErrorCode.EMAIL_TAKEN],
-        message: CustomerErrorCode.EMAIL_TAKEN, // or keep a short fallback
+        message: CustomerErrorCode.EMAIL_TAKEN,
         values: {
           name: validated.data.name,
           email: validated.data.email,
-          image_url: image_url ?? undefined,
+          image_url,
         },
       };
     }
 
+    console.error(error);
     return {
       errors: {},
       errorCodes: [CustomerErrorCode.DATABASE_ERROR],
@@ -729,82 +432,25 @@ if (hasFile) {
       values: {
         name: validated.data.name,
         email: validated.data.email,
-        image_url: image_url ?? undefined,
+        image_url,
       },
     };
   }
 
   const returnToRaw = formData.get('returnTo');
   const returnTo =
-    typeof returnToRaw === 'string' && returnToRaw.startsWith('/dashboard/customers')
+    typeof returnToRaw === 'string' &&
+    returnToRaw.startsWith('/dashboard/customers')
       ? returnToRaw
       : '/dashboard/customers';
 
   revalidatePath('/dashboard', 'layout');
-  revalidatePath('/dashboard/customers', 'layout');
   revalidatePath('/dashboard/customers');
-  revalidatePath(`/dashboard/customers/${id}`);// detail page too
-  // redirect('/dashboard/customers');
+  revalidatePath(`/dashboard/customers/${id}`);
   redirect(returnTo);
 }
 
-
-// export async function deleteCustomer(id: string) {
-//   // 1. Check pending invoices
-//   const pending = await sql`
-//     SELECT COUNT(*)::int AS count
-//     FROM invoices
-//     WHERE customer_id = ${id} AND status = 'pending'
-//   `;
-
-//   const pendingCount = pending[0]?.count ?? 0;
-
-//   if (pendingCount > 0) {
-//     // Throw so the form does not stay in a weird state.
-//     // You can later catch this with an error.tsx or a toast.
-//     throw new Error(
-//       `Cannot delete this customer. They still have ${pendingCount} pending invoice${pendingCount === 1 ? '' : 's'}.`,
-//     );
-//   }
-
-//   // 2. Archive + delete in one transaction
-//   try {
-//     await sql.begin(async (sql) => {
-//       await sql`
-//         INSERT INTO customers_history (id, name, email, image_url)
-//         SELECT id, name, email, image_url
-//         FROM customers
-//         WHERE id = ${id}
-//       `;
-
-//       await sql`
-//         INSERT INTO invoices_history (id, customer_id, amount, status, date)
-//         SELECT id, customer_id, amount, status, date
-//         FROM invoices
-//         WHERE customer_id = ${id}
-//       `;
-
-//       await sql`
-//         DELETE FROM invoices
-//         WHERE customer_id = ${id}
-//       `;
-
-//       await sql`
-//         DELETE FROM customers
-//         WHERE id = ${id}
-//       `;
-//     });
-//   } catch (error) {
-//     console.error('Delete customer error:', error);
-//     throw new Error('Database Error: Failed to delete customer.');
-//   }
-
-//   revalidatePath('/dashboard/customers');
-//   redirect('/dashboard/customers');
-// }
-
 export async function deleteCustomer(id: string) {
-  // 1. Check pending invoices
   const pending = await sql`
     SELECT COUNT(*)::int AS count
     FROM invoices
@@ -815,34 +461,35 @@ export async function deleteCustomer(id: string) {
 
   if (pendingCount > 0) {
     return {
-      success: false,
-      message: `Cannot delete this customer. They still have ${pendingCount} pending invoice${pendingCount === 1 ? '' : 's'}.`,
+      success: false as const,
+      message: `Cannot delete this customer. They still have ${pendingCount} pending invoice${
+        pendingCount === 1 ? '' : 's'
+      }.`,
     };
   }
 
-  // 2. Archive + delete in one transaction
   try {
-    await sql.begin(async (sql) => {
-      await sql`
+    await sql.begin(async (tx) => {
+      await tx`
         INSERT INTO customers_history (id, name, email, image_url)
         SELECT id, name, email, image_url
         FROM customers
         WHERE id = ${id}
       `;
 
-      await sql`
+      await tx`
         INSERT INTO invoices_history (id, customer_id, amount, status, date)
         SELECT id, customer_id, amount, status, date
         FROM invoices
         WHERE customer_id = ${id}
       `;
 
-      await sql`
+      await tx`
         DELETE FROM invoices
         WHERE customer_id = ${id}
       `;
 
-      await sql`
+      await tx`
         DELETE FROM customers
         WHERE id = ${id}
       `;
@@ -850,13 +497,12 @@ export async function deleteCustomer(id: string) {
   } catch (error) {
     console.error('Delete customer error:', error);
     return {
-      success: false,
+      success: false as const,
       message: 'Database Error: Failed to delete customer.',
     };
   }
 
   revalidatePath('/dashboard', 'layout');
-  revalidatePath('/dashboard/customers', 'layout');
   revalidatePath('/dashboard/customers');
-  return { success: true };
+  return { success: true as const };
 }
