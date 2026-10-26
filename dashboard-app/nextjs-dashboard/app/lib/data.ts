@@ -160,6 +160,7 @@ export async function fetchInvoiceById(id: string) {
         invoices.customer_id,
         invoices.amount,
         invoices.status
+        invoices.description
       FROM invoices
       WHERE invoices.id = ${id};
     `;
